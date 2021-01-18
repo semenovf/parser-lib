@@ -7,8 +7,9 @@
 //      2021.01.16 Initial version
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
+
 #include "error.hpp"
-// #include <algorithm>
+#include "pfs/parser/core_rules.hpp"
 #include <bitset>
 // #include <functional>
 // #include <iterator>
@@ -85,6 +86,23 @@ using parse_policy_set = std::bitset<parse_policy_count>;
 // }
 
 /**
+ * @return @c true if @a ch is any 7-bit US-ASCII character, excluding NUL,
+ *         otherwise @c false.
+ *
+ * @note Grammar
+ * prose_value_char = %x20-3D / %x3F-7E
+ */
+template <typename CharType>
+inline bool is_prose_value_char (CharType ch)
+{
+    auto a = uint32_t(ch) >= uint32_t(CharType('\x20'))
+        && uint32_t(ch) <= uint32_t(CharType('\x3D'));
+
+    return a || (uint32_t(ch) >= uint32_t(CharType('\x3F'))
+        && uint32_t(ch) <= uint32_t(CharType('\x7E')));
+}
+
+/**
  * @brief Advance by @c prose value.
  *
  * @param pos On input - first position, on output - last good position.
@@ -95,14 +113,12 @@ using parse_policy_set = std::bitset<parse_policy_count>;
  * @note Grammar
  * prose-val = "<" *(%x20-3D / %x3F-7E) ">"
  *             ; bracketed string of SP and VCHAR without angles
- *             ; prose description, to be used as last resort
+ *             ; prose description, to be used as last resort;
+ *             ; %x3E - is a right bracket character '>'
  */
-template <typename ForwardIterator, typename ContextType>
+template <typename ForwardIterator>
 bool advance_prose_value (ForwardIterator & pos
-    , ForwardIterator last
-    , ContextType * ctx = nullptr/*
-    , OutputIterator output
-    , error_code & ec*/)
+    , ForwardIterator last)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
@@ -111,16 +127,21 @@ bool advance_prose_value (ForwardIterator & pos
     if (p == last)
         return false;
 
-    if (*p != '<')
+    if (*p != char_type('<'))
         return false;
 
     ++p;
 
-    while (p != last && (is_sp_char(*p) || is_vchar(*p)))
+    while (p != last && is_prose_value_char(*p))
         ++p;
 
-    if (*p != '>')
+    if (p == last)
         return false;
+
+    if (*p != char_type('>'))
+        return false;
+
+    ++p;
 
     return compare_and_assign(pos, p);
 }

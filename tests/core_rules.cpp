@@ -1,3 +1,11 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2021 Vladislav Trifochkin
+//
+// This file is part of [pfs-parser](https://github.com/semenovf/pfs-parser) library.
+//
+// Changelog:
+//      2021.01.17 Initial version
+////////////////////////////////////////////////////////////////////////////////
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "pfs/parser/core_rules.hpp"

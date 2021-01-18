@@ -18,7 +18,9 @@ endif()
 # Copy test files to build folder
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION .)
 
-set(TEST_NAMES core_rules)
+set(TEST_NAMES
+    core_rules
+    abnf_rules)
 
 foreach (name ${TEST_NAMES})
     if (${name}_SOURCES)
