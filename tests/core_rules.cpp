@@ -12,28 +12,28 @@
 #include <string>
 #include <vector>
 
-TEST_CASE("is_alpha") {
-    using pfs::parser::is_alpha;
+TEST_CASE("is_alpha_char") {
+    using pfs::parser::is_alpha_char;
 
-    CHECK(is_alpha('a'));
-    CHECK(is_alpha('z'));
-    CHECK(is_alpha('A'));
-    CHECK(is_alpha('Z'));
-    CHECK_FALSE(is_alpha('0'));
-    CHECK_FALSE(is_alpha('9'));
-    CHECK_FALSE(is_alpha(' '));
-    CHECK_FALSE(is_alpha('\t'));
-    CHECK_FALSE(is_alpha('\r'));
-    CHECK_FALSE(is_alpha('\n'));
+    CHECK(is_alpha_char('a'));
+    CHECK(is_alpha_char('z'));
+    CHECK(is_alpha_char('A'));
+    CHECK(is_alpha_char('Z'));
+    CHECK_FALSE(is_alpha_char('0'));
+    CHECK_FALSE(is_alpha_char('9'));
+    CHECK_FALSE(is_alpha_char(' '));
+    CHECK_FALSE(is_alpha_char('\t'));
+    CHECK_FALSE(is_alpha_char('\r'));
+    CHECK_FALSE(is_alpha_char('\n'));
 }
 
-TEST_CASE("is_bit") {
-    using pfs::parser::is_bit;
+TEST_CASE("is_bit_char") {
+    using pfs::parser::is_bit_char;
 
-    CHECK(is_bit('0'));
-    CHECK(is_bit('1'));
-    CHECK_FALSE(is_bit('2'));
-    CHECK_FALSE(is_bit('A'));
+    CHECK(is_bit_char('0'));
+    CHECK(is_bit_char('1'));
+    CHECK_FALSE(is_bit_char('2'));
+    CHECK_FALSE(is_bit_char('A'));
 }
 
 TEST_CASE("is_ascii_char") {
@@ -238,5 +238,98 @@ TEST_CASE("advance_linear_whitespace") {
 
         CHECK_FALSE(advance_linear_whitespace(pos, linear_whitespace.end()));
         CHECK(pos == linear_whitespace.begin());
+    }
+}
+
+TEST_CASE("advance_bit_chars") {
+    using pfs::parser::advance_bit_chars;
+
+    std::vector<char> bit_chars[] = {
+          {'1'}
+        , {'1', '1'}
+        , {'0'}
+        , {'0', '0'}
+        , {'1', '0'}
+        , {'1', '0', '1'}
+    };
+
+    std::vector<char> bad_bit_chars[] = {
+          {'x'}
+    };
+
+    for (auto const & item: bit_chars) {
+        auto pos = item.begin();
+        CHECK(advance_bit_chars(pos, item.end()));
+        CHECK(pos == item.end());
+    }
+
+    for (auto const & item: bad_bit_chars) {
+        auto pos = item.begin();
+
+        CHECK_FALSE(advance_bit_chars(pos, item.end()));
+        CHECK(pos == item.begin());
+    }
+}
+
+TEST_CASE("advance_digit_chars") {
+    using pfs::parser::advance_digit_chars;
+
+    std::vector<char> digit_chars[] = {
+          {'1'}
+        , {'1', '1'}
+        , {'0'}
+        , {'0', '0'}
+        , {'1', '0'}
+        , {'1', '0', '1'}
+        , {'9', '8', '7'}
+    };
+
+    std::vector<char> bad_digit_chars[] = {
+          {'x'}
+    };
+
+    for (auto const & item: digit_chars) {
+        auto pos = item.begin();
+        CHECK(advance_digit_chars(pos, item.end()));
+        CHECK(pos == item.end());
+    }
+
+    for (auto const & item: bad_digit_chars) {
+        auto pos = item.begin();
+
+        CHECK_FALSE(advance_digit_chars(pos, item.end()));
+        CHECK(pos == item.begin());
+    }
+}
+
+TEST_CASE("advance_hexdigit_chars") {
+    using pfs::parser::advance_hexdigit_chars;
+
+    std::vector<char> hexdigit_chars[] = {
+          {'1'}
+        , {'1', '1'}
+        , {'0'}
+        , {'0', '0'}
+        , {'1', '0'}
+        , {'1', '0', '1'}
+        , {'9', '8', '7'}
+        , {'A', 'b', 'c'}
+    };
+
+    std::vector<char> bad_hexdigit_chars[] = {
+          {'x'}
+    };
+
+    for (auto const & item: hexdigit_chars) {
+        auto pos = item.begin();
+        CHECK(advance_hexdigit_chars(pos, item.end()));
+        CHECK(pos == item.end());
+    }
+
+    for (auto const & item: bad_hexdigit_chars) {
+        auto pos = item.begin();
+
+        CHECK_FALSE(advance_hexdigit_chars(pos, item.end()));
+        CHECK(pos == item.begin());
     }
 }

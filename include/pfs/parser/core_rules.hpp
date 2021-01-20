@@ -33,7 +33,7 @@ inline bool compare_and_assign (ForwardIterator & a, ForwardIterator b)
  * ALPHA = %x41-5A / %x61-7A ; A-Z / a-z
  */
 template <typename CharType>
-inline bool is_alpha (CharType ch)
+inline bool is_alpha_char (CharType ch)
 {
     auto a = uint32_t(ch) >= uint32_t(CharType('\x41'))
         &&   uint32_t(ch) <= uint32_t(CharType('\x5A'));
@@ -48,7 +48,7 @@ inline bool is_alpha (CharType ch)
  * BIT = "0" / "1"
  */
 template <typename CharType>
-inline bool is_bit (CharType ch)
+inline bool is_bit_char (CharType ch)
 {
     return uint32_t(ch) == uint32_t(CharType('0')) || uint32_t(ch) == uint32_t(CharType('1'));
 }
@@ -308,6 +308,61 @@ bool advance_linear_whitespace (ForwardIterator & pos, ForwardIterator last)
     }
 
     return compare_and_assign(pos, p);
+}
+
+/**
+ * @brief Advance by repeating character sequence.
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ */
+template <typename ForwardIterator>
+bool advance_repeating_chars (ForwardIterator & pos
+    , ForwardIterator last
+    , bool (* predicate) (typename std::remove_reference<decltype(*pos)>::type))
+{
+    auto p = pos;
+
+    if (p == last)
+        return false;
+
+    if (!predicate(*p))
+        return false;
+
+    ++p;
+
+    while (p != last && predicate(*p))
+        ++p;
+
+    return compare_and_assign(pos, p);
+}
+
+/**
+ * @brief Advance by bit characters.
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ */
+template <typename ForwardIterator>
+inline bool advance_bit_chars (ForwardIterator & pos, ForwardIterator last)
+{
+    return advance_repeating_chars<ForwardIterator>(pos, last, is_bit_char);
+}
+
+/**
+ * @brief Advance by decimal digit characters.
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ */
+template <typename ForwardIterator>
+inline bool advance_digit_chars (ForwardIterator & pos, ForwardIterator last)
+{
+    return advance_repeating_chars<ForwardIterator>(pos, last, is_digit_char);
+}
+
+/**
+ * @brief Advance by hexadecimal digit characters.
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ */
+template <typename ForwardIterator>
+inline bool advance_hexdigit_chars (ForwardIterator & pos, ForwardIterator last)
+{
+    return advance_repeating_chars<ForwardIterator>(pos, last, is_hexdigit_char);
 }
 
 }} // namespace pfs::parser

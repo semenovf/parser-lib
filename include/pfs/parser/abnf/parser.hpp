@@ -109,7 +109,6 @@ inline bool is_prose_value_char (CharType ch)
  * @param last End of sequence position.
  * @return @c true if advanced by at least one position, otherwise @c false.
  *
- * @note Rule names are case insensitive.
  * @note Grammar
  * prose-val = "<" *(%x20-3D / %x3F-7E) ">"
  *             ; bracketed string of SP and VCHAR without angles
@@ -142,6 +141,125 @@ bool advance_prose_value (ForwardIterator & pos
         return false;
 
     ++p;
+
+    return compare_and_assign(pos, p);
+}
+
+enum class number_flag {
+    unspecified, binary, decimal, hexadecimal
+};
+
+/**
+ * @brief Advance by @c number value.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param callbacks Structure satisfying requirements of HexValueCallbacks
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * NumValueCallbacks {
+ *     first_number_value (number_flag, ForwardIterator first, ForwardIterator last)
+ *     last_number_value (number_flag, ForwardIterator first, ForwardIterator last)
+ *     next_number_value (number_flag, ForwardIterator first, ForwardIterator last)
+ * }
+ *
+ * @note Grammar
+ * num-val = "%" (bin-val / dec-val / hex-val)
+ * bin-val = "b" 1*BIT [ 1*("." 1*BIT) / ("-" 1*BIT) ] ; series of concatenated bit values or single ONEOF range
+ * dec-val = "d" 1*DIGIT [ 1*("." 1*DIGIT) / ("-" 1*DIGIT) ]
+ * hex-val = "x" 1*HEXDIG [ 1*("." 1*HEXDIG) / ("-" 1*HEXDIG) ]
+ */
+template <typename ForwardIterator, typename Callbacks>
+bool advance_number_value (ForwardIterator & pos
+    , ForwardIterator last
+    , Callbacks * callbacks = nullptr)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+
+    auto p = pos;
+
+    if (p == last)
+        return false;
+
+    if (*p != char_type('%'))
+        return false;
+
+    ++p;
+
+    if (p == last)
+        return false;
+
+    number_flag flag = number_flag::unspecified;
+    bool (* advance_func)(ForwardIterator &, ForwardIterator) = nullptr;
+    bool (* is_digit_func)(char_type) = nullptr;
+
+    if (*p == char_type('x')) {
+        advance_func = advance_hexdigit_chars;
+        is_digit_func = is_hexdigit_char;
+        flag = number_flag::hexadecimal;
+    } else if (*p == char_type('d')) {
+        advance_func = advance_digit_chars;
+        is_digit_func = is_digit_char;
+        flag = number_flag::decimal;
+    } else if (*p == char_type('b')) {
+        advance_func = advance_bit_chars;
+        is_digit_func = is_bit_char;
+        flag = number_flag::binary;
+    } else {
+        return false;
+    }
+
+    ++p;
+
+    if (p == last)
+        return false;
+
+    auto first_pos = p;
+
+    if (!advance_func(p, last))
+        return false;
+
+    if (callbacks)
+        callbacks->first_number_value(flag, first_pos, p);
+
+    if (p != last) {
+        if (*p == char_type('-')) {
+            ++p;
+
+            // At least one digit character must exists
+            if (!is_digit_func(*p))
+                return false;
+
+            first_pos = p;
+
+            if (!advance_func(p, last))
+                return false;
+
+            if (callbacks)
+                callbacks->last_number_value(flag, first_pos, p);
+        } else if (*p == char_type('.')) {
+            while (*p == char_type('.')) {
+                ++p;
+
+                // At least one digit character must exists
+                if (!is_digit_func(*p))
+                    return false;
+
+                first_pos = p;
+
+                if (!advance_func(p, last))
+                    return false;
+
+                if (callbacks)
+                    callbacks->next_number_value(flag, first_pos, p);
+            }
+
+            // Notify observer no more valid elements parsed
+            if (callbacks)
+                callbacks->last_number_value(flag, p, p);
+        }
+    }
 
     return compare_and_assign(pos, p);
 }
