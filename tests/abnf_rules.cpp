@@ -12,6 +12,7 @@
 #include <vector>
 
 using pfs::parser::error_code;
+using forward_iterator = std::vector<char>::const_iterator;
 
 TEST_CASE("is_prose_value_char") {
     using pfs::parser::abnf::is_prose_value_char;
@@ -35,8 +36,13 @@ TEST_CASE("is_prose_value_char") {
     CHECK_FALSE(is_prose_value_char('\x7F'));
 }
 
-TEST_CASE("advance_prose_value") {
-    using pfs::parser::abnf::advance_prose_value;
+struct dummy_prose_context
+{
+    void prose (forward_iterator, forward_iterator) {}
+};
+
+TEST_CASE("advance_prose") {
+    using pfs::parser::abnf::advance_prose;
 
     std::vector<char> valid_values[] = {
           {'<', '>'}
@@ -61,29 +67,29 @@ TEST_CASE("advance_prose_value") {
         , {'<', ' ', 'x', ' '}
     };
 
+    dummy_prose_context * ctx = nullptr;
+
     for (auto const & item: valid_values) {
         auto pos = item.begin();
-        CHECK(advance_prose_value(pos, item.end()));
+        CHECK(advance_prose(pos, item.end(), ctx));
         CHECK(pos == item.end());
     }
 
     for (auto const & item: invalid_values) {
         auto pos = item.begin();
-        CHECK_FALSE(advance_prose_value(pos, item.end()));
+        CHECK_FALSE(advance_prose(pos, item.end(), ctx));
     }
 }
 
-using forward_iterator = std::vector<char>::const_iterator;
-
-struct number_value_callbacks
+struct dummy_number_context
 {
-    void first_number_value (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
-    void last_number_value (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
-    void next_number_value (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
+    void first_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
+    void last_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
+    void next_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
 };
 
-TEST_CASE("advance_number_value") {
-    using pfs::parser::abnf::advance_number_value;
+TEST_CASE("advance_number") {
+    using pfs::parser::abnf::advance_number;
 
     std::vector<char> valid_values[] = {
           {'%', 'b', '0'}
@@ -133,23 +139,23 @@ TEST_CASE("advance_number_value") {
         , {'%', 'x', 'F', '.'}
     };
 
-    number_value_callbacks * callbacks = nullptr;
+    dummy_number_context * ctx = nullptr;
 
 //     {
 //         std::vector<char> item = {'%', 'b'};
 //         auto pos = item.begin();
-//         advance_number_value(pos, item.end(), callbacks);
+//         advance_number(pos, item.end(), callbacks);
 //     }
 
     for (auto const & item: valid_values) {
         auto pos = item.begin();
-        CHECK(advance_number_value(pos, item.end(), callbacks));
+        CHECK(advance_number(pos, item.end(), ctx));
         CHECK(pos == item.end());
     }
 
     for (auto const & item: invalid_values) {
         auto pos = item.begin();
-        CHECK_FALSE(advance_number_value(pos, item.end(), callbacks));
+        CHECK_FALSE(advance_number(pos, item.end(), ctx));
     }
 }
 
@@ -603,3 +609,53 @@ TEST_CASE("advance_rulename") {
 //     }
 }
 
+struct dummy_element_context
+{
+    // RulenameContext
+    void rulename (forward_iterator first, forward_iterator last) {}
+
+    // NumberContext
+    void first_number(pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
+    void last_number(pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
+    void next_number(pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
+
+    // QuotedStringContext
+    void quoted_string(forward_iterator, forward_iterator) {}
+    void error(error_code) {}
+    size_t max_quoted_string_length() { return 0; }
+
+    // ProseContext
+    void prose(forward_iterator, forward_iterator) {}
+};
+
+TEST_CASE("advance_element") {
+    using pfs::parser::abnf::advance_element;
+
+    std::vector<char> valid_values[] = {
+          {'A'}
+        , {'A', '1'}
+        , {'A', '1', '-'}
+        , {'A', '-', '1'}
+    };
+
+    std::vector<char> invalid_values[] = {
+          {'1'}
+        , {'-'}
+        , {' '}
+    };
+
+    {
+        dummy_element_context * ctx = nullptr;
+
+        for (auto const & item : valid_values) {
+            auto pos = item.begin();
+            CHECK(advance_element(pos, item.end(), ctx));
+            CHECK(pos == item.end());
+        }
+
+        for (auto const & item : invalid_values) {
+            auto pos = item.begin();
+            CHECK_FALSE(advance_element(pos, item.end(), ctx));
+        }
+    }
+}

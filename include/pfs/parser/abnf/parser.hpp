@@ -1,4 +1,4 @@
-////////////////////////////////////////////////////////////////////////////////
+﻿////////////////////////////////////////////////////////////////////////////////
 // Copyright (c) 2021 Vladislav Trifochkin
 //
 // This file is part of [pfs-parser](https://github.com/semenovf/pfs-parser) library.
@@ -107,7 +107,13 @@ inline bool is_prose_value_char (CharType ch)
  *
  * @param pos On input - first position, on output - last good position.
  * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of ProseContext.
  * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * ProseContext {
+ *     void prose (ForwardIterator first, ForwardIterator last)
+ * }
  *
  * @note Grammar
  * prose-val = "<" *(%x20-3D / %x3F-7E) ">"
@@ -115,9 +121,10 @@ inline bool is_prose_value_char (CharType ch)
  *             ; prose description, to be used as last resort;
  *             ; %x3E - is a right bracket character '>'
  */
-template <typename ForwardIterator>
-bool advance_prose_value (ForwardIterator & pos
-    , ForwardIterator last)
+template <typename ForwardIterator, typename ProseContext>
+bool advance_prose (ForwardIterator & pos
+    , ForwardIterator last
+    , ProseContext * ctx = nullptr)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
@@ -129,6 +136,8 @@ bool advance_prose_value (ForwardIterator & pos
     if (*p != char_type('<'))
         return false;
 
+    auto first_pos = p;
+
     ++p;
 
     while (p != last && is_prose_value_char(*p))
@@ -139,6 +148,9 @@ bool advance_prose_value (ForwardIterator & pos
 
     if (*p != char_type('>'))
         return false;
+
+    if (ctx)
+        ctx->prose(first_pos, p);
 
     ++p;
 
@@ -154,14 +166,14 @@ enum class number_flag {
  *
  * @param pos On input - first position, on output - last good position.
  * @param last End of sequence position.
- * @param callbacks Structure satisfying requirements of NumValueContext
+ * @param ctx Structure satisfying requirements of NumberContext
  * @return @c true if advanced by at least one position, otherwise @c false.
  *
  * @par
- * NumValueContext {
- *     void first_number_value (number_flag, ForwardIterator first, ForwardIterator last)
- *     void last_number_value (number_flag, ForwardIterator first, ForwardIterator last)
- *     void next_number_value (number_flag, ForwardIterator first, ForwardIterator last)
+ * NumberContext {
+ *     void first_number (number_flag, ForwardIterator first, ForwardIterator last)
+ *     void last_number (number_flag, ForwardIterator first, ForwardIterator last)
+ *     void next_number (number_flag, ForwardIterator first, ForwardIterator last)
  * }
  *
  * @note Grammar
@@ -170,10 +182,10 @@ enum class number_flag {
  * dec-val = "d" 1*DIGIT [ 1*("." 1*DIGIT) / ("-" 1*DIGIT) ]
  * hex-val = "x" 1*HEXDIG [ 1*("." 1*HEXDIG) / ("-" 1*HEXDIG) ]
  */
-template <typename ForwardIterator, typename NumValueContext>
-bool advance_number_value (ForwardIterator & pos
+template <typename ForwardIterator, typename NumberContext>
+bool advance_number (ForwardIterator & pos
     , ForwardIterator last
-    , NumValueContext * ctx = nullptr)
+    , NumberContext * ctx = nullptr)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
@@ -221,7 +233,7 @@ bool advance_number_value (ForwardIterator & pos
         return false;
 
     if (ctx)
-        ctx->first_number_value(flag, first_pos, p);
+        ctx->first_number(flag, first_pos, p);
 
     if (p != last) {
         if (*p == char_type('-')) {
@@ -237,7 +249,7 @@ bool advance_number_value (ForwardIterator & pos
                 return false;
 
             if (ctx)
-                ctx->last_number_value(flag, first_pos, p);
+                ctx->last_number(flag, first_pos, p);
         } else if (*p == char_type('.')) {
             while (*p == char_type('.')) {
                 ++p;
@@ -252,12 +264,12 @@ bool advance_number_value (ForwardIterator & pos
                     return false;
 
                 if (ctx)
-                    ctx->next_number_value(flag, first_pos, p);
+                    ctx->next_number(flag, first_pos, p);
             }
 
             // Notify observer no more valid elements parsed
             if (ctx)
-                ctx->last_number_value(flag, p, p);
+                ctx->last_number(flag, p, p);
         }
     }
 
@@ -559,6 +571,79 @@ bool advance_rulename (ForwardIterator & pos
 
     return compare_and_assign(pos, p);
 }
+
+// Forward decalration for advance_group() and advance_option()
+// used in advance_element()
+
+template <typename ForwardIterator, typename GroupContext>
+bool advance_group (ForwardIterator &
+    , ForwardIterator
+    , GroupContext * ctx);
+
+template <typename ForwardIterator, typename OptionContext>
+bool advance_option (ForwardIterator &
+    , ForwardIterator
+    , OptionContext * ctx);
+
+/**
+ * @brief Advance by element.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of ElementContext
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * ElementContext extends RulenameContext
+ *      , GroupContext 
+ *      , OptionContext
+ *      , QuotedStringContext 
+ *      , NumberContext 
+ *      , ProseContext { }
+ *
+ * @note Grammar
+ * element = rulename / group / option / char-val / num-val / prose-val
+ */
+template <typename ForwardIterator, typename ElementContext>
+bool advance_element (ForwardIterator & pos
+    , ForwardIterator last
+    , ElementContext * ctx = nullptr)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+
+    auto p = pos;
+
+    if (p == last)
+        return false;
+
+    return advance_rulename(pos, last, ctx)
+        || advance_group(pos, last, ctx)
+        || advance_option(pos, last, ctx)
+        || advance_number(pos, last, ctx)
+        || advance_quoted_string(pos, last, ctx)
+        || advance_prose(pos, last, ctx);
+}
+
+/**
+ */
+template <typename ForwardIterator, typename GroupContext>
+bool advance_group(ForwardIterator &
+    , ForwardIterator
+    , GroupContext * ctx = nullptr)
+{
+    // TODO Implement
+    return false;
+}
+
+template <typename ForwardIterator, typename OptionContext>
+bool advance_option(ForwardIterator &
+    , ForwardIterator
+    , OptionContext * ctx = nullptr)
+{
+    // TODO Implement
+    return false;
+}
+
 
 // /**
 //  * @brief Advance by whitespace or comment or new line and whitespace.
