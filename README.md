@@ -4,8 +4,8 @@
 [![License](resources/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Header Only](resources/badge/header-only.svg)](https://en.wikipedia.org/wiki/Header-only)
 [![Build Status](https://travis-ci.org/semenovf/pfs-parser.svg?branch=master)](https://travis-ci.org/semenovf/pfs-parser)
-[![Build status](https://ci.appveyor.com/api/projects/status/owogk328rraglcbp/branch/master?svg=true)](https://ci.appveyor.com/project/semenovf/pfs-uri-geo/branch/master)
-[![codecov](https://codecov.io/gh/semenovf/pfs-uri-geo/branch/master/graph/badge.svg)](https://codecov.io/gh/semenovf/pfs-uri-geo)
+[![Build status](https://ci.appveyor.com/api/projects/status/gxhqybsbyqfivlwi?svg=true)](https://ci.appveyor.com/project/semenovf/pfs-parser)
+[![codecov](https://codecov.io/gh/semenovf/pfs-parser/branch/master/graph/badge.svg?token=4tY6jqPB7i)](https://codecov.io/gh/semenovf/pfs-parser)
 
 # pfs-parser
 Parser generator library and tools
