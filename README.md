@@ -3,7 +3,7 @@
 [![Standard](resources/badge/cxx-11-14-17-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B#Standardization)
 [![License](resources/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Header Only](resources/badge/header-only.svg)](https://en.wikipedia.org/wiki/Header-only)
-[![Build Status](https://travis-ci.org/semenovf/pfs-parser)](https://travis-ci.org/semenovf/pfs-parser)
+[![Build Status](https://travis-ci.org/semenovf/pfs-parser.svg?branch=master)](https://travis-ci.org/semenovf/pfs-parser)
 [![Build status](https://ci.appveyor.com/api/projects/status/owogk328rraglcbp/branch/master?svg=true)](https://ci.appveyor.com/project/semenovf/pfs-uri-geo/branch/master)
 [![codecov](https://codecov.io/gh/semenovf/pfs-uri-geo/branch/master/graph/badge.svg)](https://codecov.io/gh/semenovf/pfs-uri-geo)
 
