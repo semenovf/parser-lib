@@ -154,14 +154,14 @@ enum class number_flag {
  *
  * @param pos On input - first position, on output - last good position.
  * @param last End of sequence position.
- * @param callbacks Structure satisfying requirements of HexValueCallbacks
+ * @param callbacks Structure satisfying requirements of NumValueContext
  * @return @c true if advanced by at least one position, otherwise @c false.
  *
  * @par
- * NumValueCallbacks {
- *     first_number_value (number_flag, ForwardIterator first, ForwardIterator last)
- *     last_number_value (number_flag, ForwardIterator first, ForwardIterator last)
- *     next_number_value (number_flag, ForwardIterator first, ForwardIterator last)
+ * NumValueContext {
+ *     void first_number_value (number_flag, ForwardIterator first, ForwardIterator last)
+ *     void last_number_value (number_flag, ForwardIterator first, ForwardIterator last)
+ *     void next_number_value (number_flag, ForwardIterator first, ForwardIterator last)
  * }
  *
  * @note Grammar
@@ -170,10 +170,10 @@ enum class number_flag {
  * dec-val = "d" 1*DIGIT [ 1*("." 1*DIGIT) / ("-" 1*DIGIT) ]
  * hex-val = "x" 1*HEXDIG [ 1*("." 1*HEXDIG) / ("-" 1*HEXDIG) ]
  */
-template <typename ForwardIterator, typename Callbacks>
+template <typename ForwardIterator, typename ContextType>
 bool advance_number_value (ForwardIterator & pos
     , ForwardIterator last
-    , Callbacks * callbacks = nullptr)
+    , ContextType * ctx = nullptr)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
@@ -220,8 +220,8 @@ bool advance_number_value (ForwardIterator & pos
     if (!advance_func(p, last))
         return false;
 
-    if (callbacks)
-        callbacks->first_number_value(flag, first_pos, p);
+    if (ctx)
+        ctx->first_number_value(flag, first_pos, p);
 
     if (p != last) {
         if (*p == char_type('-')) {
@@ -236,8 +236,8 @@ bool advance_number_value (ForwardIterator & pos
             if (!advance_func(p, last))
                 return false;
 
-            if (callbacks)
-                callbacks->last_number_value(flag, first_pos, p);
+            if (ctx)
+                ctx->last_number_value(flag, first_pos, p);
         } else if (*p == char_type('.')) {
             while (*p == char_type('.')) {
                 ++p;
@@ -251,18 +251,117 @@ bool advance_number_value (ForwardIterator & pos
                 if (!advance_func(p, last))
                     return false;
 
-                if (callbacks)
-                    callbacks->next_number_value(flag, first_pos, p);
+                if (ctx)
+                    ctx->next_number_value(flag, first_pos, p);
             }
 
             // Notify observer no more valid elements parsed
-            if (callbacks)
-                callbacks->last_number_value(flag, p, p);
+            if (ctx)
+                ctx->last_number_value(flag, p, p);
         }
     }
 
     return compare_and_assign(pos, p);
 }
+
+/**
+ * @brief Advance by quoted string.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of QuotedStringContext
+ * @error @c unbalanced_quote if quote is unbalanced.
+ * @error @c bad_quoted_char if quoted string contains invalid character.
+ * @error @c max_lengh_exceeded if quoted string length too long.
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * QuotedStringContext {
+ *     size_t max_quoted_string_length ()
+ *     void quoted_string (ForwardIterator first, ForwardIterator last)
+ *     void error (error_code ec);
+ * }
+ *
+ * @note Grammar
+ * char-val = DQUOTE *(%x20-21 / %x23-7E) DQUOTE
+ *                  ; quoted string of SP and VCHAR
+ *                  ; without DQUOTE (%x22)
+ */
+template <typename ForwardIterator, typename ContextType>
+bool advance_quoted_string (ForwardIterator & pos
+    , ForwardIterator last
+    , ContextType * ctx = nullptr)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+
+    auto p = pos;
+
+    if (p == last)
+        return false;
+
+    if (!is_dquote_char(*p))
+        return false;
+
+    ++p;
+
+    auto first_pos = p;
+
+    if (p == last) {
+        if (ctx) {
+            auto ec = make_error_code(errc::unbalanced_quote);
+            ctx->error(ec);
+        }
+        return false;
+    }
+
+    size_t length = 0;
+    size_t max_length = ctx
+        ? ctx->max_quoted_string_length()
+        : std::numeric_limits<size_t>::max();
+
+    if (max_length == 0)
+        max_length = std::numeric_limits<size_t>::max();
+
+    // Parse quoted string of SP and VCHAR without DQUOTE
+    while (p != last && !is_dquote_char(*p)) {
+        if (!(is_visible_char(*p) || is_space_char(*p))) {
+            if (ctx) {
+                auto ec = make_error_code(errc::bad_quoted_char);
+                ctx->error(ec);
+            }
+
+            return false;
+        }
+
+        if (length == max_length) {
+            if (ctx) {
+                auto ec = make_error_code(errc::max_lengh_exceeded);
+                ctx->error(ec);
+            }
+            return false;
+        }
+
+        ++length;
+        ++p;
+    }
+
+    if (p == last) {
+        if (ctx) {
+            auto ec = make_error_code(errc::unbalanced_quote);
+            ctx->error(ec);
+        }
+        return false;
+    }
+
+    if (ctx) {
+        ctx->quoted_string(first_pos, p);
+    }
+
+    ++p; // Skip DQUOTE
+
+    return compare_and_assign(pos, p);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // advance_rule

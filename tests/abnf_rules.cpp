@@ -11,6 +11,8 @@
 #include "pfs/parser/abnf/parser.hpp"
 #include <vector>
 
+using pfs::parser::error_code;
+
 TEST_CASE("is_prose_value_char") {
     using pfs::parser::abnf::is_prose_value_char;
 
@@ -148,5 +150,110 @@ TEST_CASE("advance_number_value") {
     for (auto const & item: invalid_values) {
         auto pos = item.begin();
         CHECK_FALSE(advance_number_value(pos, item.end(), callbacks));
+    }
+}
+
+struct quoted_string_context
+{
+    size_t max_length = 0;
+    std::string result_str;
+    error_code result_ec = pfs::parser::make_error_code(pfs::parser::errc::success);
+
+    quoted_string_context (size_t limit = 0)
+    {
+        max_length = limit;
+    }
+
+    void quoted_string (std::string::const_iterator first
+        , std::string::const_iterator last)
+    {
+        result_str = std::string(first, last);
+    }
+
+    void error (error_code ec)
+    {
+        result_ec = ec;
+    }
+
+    size_t max_quoted_string_length ()
+    {
+        return max_length;
+    }
+};
+
+struct dummy_quoted_string_context
+{
+    void quoted_string (forward_iterator, forward_iterator) {}
+    void error (error_code) {}
+    size_t max_quoted_string_length () { return 0; }
+};
+
+TEST_CASE("advance_quoted_string") {
+    using pfs::parser::abnf::advance_quoted_string;
+
+    std::vector<char> valid_values[] = {
+          {'"', '"'}
+        , {'"', ' ', '"'}
+        , {'"', '\x21', ' ', '\x7E', '"'}
+    };
+
+    std::vector<char> invalid_values[] = {
+          {'x'}
+        , {'"'}
+        , {'"', 'x'}
+        , {'"', '\x19', '"'}
+        , {'"', '\x7F', '"'}
+    };
+
+    {
+        dummy_quoted_string_context * ctx = nullptr;
+
+        for (auto const & item: valid_values) {
+            auto pos = item.begin();
+            CHECK(advance_quoted_string(pos, item.end(), ctx));
+            CHECK(pos == item.end());
+        }
+
+        for (auto const & item: invalid_values) {
+            auto pos = item.begin();
+            CHECK_FALSE(advance_quoted_string(pos, item.end(), ctx));
+        }
+    }
+
+    {
+        quoted_string_context ctx;
+        std::string s {"\"Hello, World!\""};
+        auto pos = s.begin();
+        CHECK(advance_quoted_string(pos, s.end(), & ctx));
+        CHECK(pos == s.end());
+        CHECK(ctx.result_str == std::string{"Hello, World!"});
+        CHECK(ctx.result_ec == pfs::parser::make_error_code(pfs::parser::errc::success));
+    }
+
+    {
+        quoted_string_context ctx;
+        std::string s {"\"x"};
+        auto pos = s.begin();
+        CHECK_FALSE(advance_quoted_string(pos, s.end(), & ctx));
+        CHECK(pos == s.begin());
+        CHECK(ctx.result_ec == pfs::parser::make_error_code(pfs::parser::errc::unbalanced_quote));
+    }
+
+    {
+        quoted_string_context ctx;
+        std::string s {"\"\x01\""};
+        auto pos = s.begin();
+        CHECK_FALSE(advance_quoted_string(pos, s.end(), & ctx));
+        CHECK(pos == s.begin());
+        CHECK(ctx.result_ec == pfs::parser::make_error_code(pfs::parser::errc::bad_quoted_char));
+    }
+
+    {
+        quoted_string_context ctx{2};
+        std::string s {"\"xyz\""};
+        auto pos = s.begin();
+        CHECK_FALSE(advance_quoted_string(pos, s.end(), & ctx));
+        CHECK(pos == s.begin());
+        CHECK(ctx.result_ec == pfs::parser::make_error_code(pfs::parser::errc::max_lengh_exceeded));
     }
 }

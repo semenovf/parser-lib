@@ -23,7 +23,9 @@ enum class errc
 
 // Parser errors
 //     , forbidden_root_element
-//     , unbalanced_quote
+    , unbalanced_quote
+    , bad_quoted_char
+    , max_lengh_exceeded
 //     , bad_escaped_char
 //     , bad_encoded_char
 //     , unbalanced_array_bracket
@@ -49,10 +51,13 @@ public:
         switch (ev) {
             case static_cast<int>(errc::success):
                 return std::string{"no error"};
-//             case static_cast<int>(errc::forbidden_root_element):
-//                 return std::string{"root element is forbidden"};
-//             case static_cast<int>(errc::unbalanced_quote):
-//                 return std::string{"unquoted string"};
+            case static_cast<int>(errc::unbalanced_quote):
+                return std::string{"unquoted string"};
+            case static_cast<int>(errc::bad_quoted_char):
+                return std::string{"bad quoted char"};
+            case static_cast<int>(errc::max_lengh_exceeded):
+                return std::string{"max length exceeded"};
+
 //             case static_cast<int>(errc::bad_escaped_char):
 //                 return std::string{"bad escaped char"};
 //             case static_cast<int>(errc::bad_encoded_char):
