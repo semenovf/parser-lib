@@ -257,3 +257,118 @@ TEST_CASE("advance_quoted_string") {
         CHECK(ctx.result_ec == pfs::parser::make_error_code(pfs::parser::errc::max_lengh_exceeded));
     }
 }
+
+struct dummy_repeat_context
+{
+    void repeat (forward_iterator fromFirst, forward_iterator fromLast
+        , forward_iterator toFirst, forward_iterator toLast) {}
+};
+
+struct repeat_context
+{
+    using forward_iterator = std::string::const_iterator;
+
+    std::string from;
+    std::string to;
+
+    void repeat (forward_iterator first_from, forward_iterator last_from
+        , forward_iterator first_to, forward_iterator last_to)
+    {
+        from = std::string{first_from, last_from};
+        to = std::string{first_to, last_to};
+    }
+};
+
+TEST_CASE("advance_repeat") {
+    using pfs::parser::abnf::advance_repeat;
+
+    std::vector<char> valid_values[] = {
+          {'1'}
+        , {'1', '2'}
+        , {'*'}
+        , {'*', '2'}
+        , {'1', '*'}
+        , {'1', '*', '2'}
+        , {'1', '0', '*', '2', '0'}
+    };
+
+    std::vector<char> invalid_values[] = {
+          {'x'}
+        , {'x', '*'}
+    };
+
+    {
+        dummy_repeat_context * ctx = nullptr;
+
+        for (auto const & item: valid_values) {
+            auto pos = item.begin();
+            CHECK(advance_repeat(pos, item.end(), ctx));
+            CHECK(pos == item.end());
+        }
+
+        for (auto const & item: invalid_values) {
+            auto pos = item.begin();
+            CHECK_FALSE(advance_repeat(pos, item.end(), ctx));
+        }
+    }
+
+    {
+        repeat_context ctx;
+        std::string s {"10"};
+        auto pos = s.begin();
+        CHECK(advance_repeat(pos, s.end(), & ctx));
+        CHECK(pos == s.end());
+        CHECK(ctx.from == std::string{"10"});
+        CHECK(ctx.to == ctx.from);
+    }
+
+    {
+        repeat_context ctx;
+        std::string s {"10*"};
+        auto pos = s.begin();
+        CHECK(advance_repeat(pos, s.end(), & ctx));
+        CHECK(pos == s.end());
+        CHECK(ctx.from == std::string{"10"});
+        CHECK(ctx.to.empty());
+    }
+
+    {
+        repeat_context ctx;
+        std::string s {"*10"};
+        auto pos = s.begin();
+        CHECK(advance_repeat(pos, s.end(), & ctx));
+        CHECK(pos == s.end());
+        CHECK(ctx.from.empty());
+        CHECK(ctx.to == std::string{"10"});
+    }
+
+    {
+        repeat_context ctx;
+        std::string s {"*"};
+        auto pos = s.begin();
+        CHECK(advance_repeat(pos, s.end(), & ctx));
+        CHECK(pos == s.end());
+        CHECK(ctx.from.empty());
+        CHECK(ctx.to.empty());
+    }
+
+    {
+        repeat_context ctx;
+        std::string s {"10*20"};
+        auto pos = s.begin();
+        CHECK(advance_repeat(pos, s.end(), & ctx));
+        CHECK(pos == s.end());
+        CHECK(ctx.from == std::string{"10"});
+        CHECK(ctx.to == std::string{"20"});
+    }
+
+    {
+        repeat_context ctx;
+        std::string s {"*x"};
+        auto pos = s.begin();
+        CHECK(advance_repeat(pos, s.end(), & ctx));
+        CHECK_FALSE(pos == s.end());
+        CHECK(ctx.from.empty());
+        CHECK(ctx.to.empty());
+    }
+}

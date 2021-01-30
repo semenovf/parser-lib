@@ -219,6 +219,7 @@ TAB_SIZE               = 4
 # documentation, which will result in a user-defined paragraph with heading
 # "Side Effects:". You can put \n's in the value part of an alias to insert
 # newlines.
+# See https://www.doxygen.nl/manual/commands.html#cmdxrefitem
 
 ALIASES += "error=\xrefitem errors \"Error\" \"Errors\"" 
 

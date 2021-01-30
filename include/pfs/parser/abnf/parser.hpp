@@ -170,10 +170,10 @@ enum class number_flag {
  * dec-val = "d" 1*DIGIT [ 1*("." 1*DIGIT) / ("-" 1*DIGIT) ]
  * hex-val = "x" 1*HEXDIG [ 1*("." 1*HEXDIG) / ("-" 1*HEXDIG) ]
  */
-template <typename ForwardIterator, typename ContextType>
+template <typename ForwardIterator, typename NumValueContext>
 bool advance_number_value (ForwardIterator & pos
     , ForwardIterator last
-    , ContextType * ctx = nullptr)
+    , NumValueContext * ctx = nullptr)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
@@ -287,10 +287,10 @@ bool advance_number_value (ForwardIterator & pos
  *                  ; quoted string of SP and VCHAR
  *                  ; without DQUOTE (%x22)
  */
-template <typename ForwardIterator, typename ContextType>
+template <typename ForwardIterator, typename QuotedStringContext>
 bool advance_quoted_string (ForwardIterator & pos
     , ForwardIterator last
-    , ContextType * ctx = nullptr)
+    , QuotedStringContext * ctx = nullptr)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
@@ -362,6 +362,78 @@ bool advance_quoted_string (ForwardIterator & pos
     return compare_and_assign(pos, p);
 }
 
+/**
+ * @brief Advance by 'repeat' rule.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of RepeatContext
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * RepeatContext {
+ *     void repeat (ForwardIterator first_from, ForwardIterator last_from
+ *          , ForwardIterator first_to, ForwardIterator last_to)
+ * }
+ *
+ * if first_from == last_from -> no low limit (*1)
+ * if first_to == toLast -> no upper limit (1*)
+ * if first_from == first_to && first_from != last_from -> is exact limit
+ *
+ * @note Grammar
+ * repeat = 1*DIGIT / (*DIGIT "*" *DIGIT)
+ */
+template <typename ForwardIterator, typename RepeatContext>
+bool advance_repeat (ForwardIterator & pos
+    , ForwardIterator last
+    , RepeatContext * ctx = nullptr)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+
+    auto p = pos;
+
+    if (p == last)
+        return false;
+
+    ForwardIterator first_from = pos;
+    ForwardIterator last_from  = pos;
+    ForwardIterator first_to   = pos;
+    ForwardIterator last_to    = pos;
+
+    do {
+        if (is_digit_char(*p)) {
+            advance_digit_chars(p, last);
+            last_from = p;
+
+            // Success, is exact limit
+            if (p == last) {
+                first_to = first_from;
+                last_to = last_from;
+                break;
+            }
+        }
+
+        if (*p == char_type('*')) {
+            ++p;
+
+            if (p == last) { // Success, second part is empty
+                break;
+            } else if (is_digit_char(*p)) {
+                first_to = p;
+                advance_digit_chars(p, last);
+                last_to = p;
+                break;
+            } else { // Success, second part is empty
+                break;
+            }
+        }
+    } while (false);
+
+    if (p != pos && ctx)
+        ctx->repeat(first_from, last_from, first_to, last_to);
+
+    return compare_and_assign(pos, p);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // advance_rule
