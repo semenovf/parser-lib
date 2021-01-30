@@ -486,14 +486,119 @@ bool advance_comment (ForwardIterator & pos
     return compare_and_assign(pos, p);
 }
 
+/**
+ * @brief Advance by comment or new line.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of CommentContext
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * CommentContext {
+ *     void comment (ForwardIterator first, ForwardIterator last)
+ * }
+ *
+ * @note Grammar
+ * c-nl = comment / CRLF ; comment or newline
+ */
+template <typename ForwardIterator, typename CommentContext>
+inline bool advance_comment_newline (ForwardIterator & pos
+    , ForwardIterator last
+    , CommentContext * ctx = nullptr)
+{
+    return advance_newline(pos, last)
+        || advance_comment(pos, last, ctx);
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+}
+
+/**
+ * @brief Advance by rule name.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of RulenameContext
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * RulenameContext {
+ *     void rulename (ForwardIterator first, ForwardIterator last)
+ * }
+ *
+ * @note Grammar
+ * rulename = ALPHA *(ALPHA / DIGIT / "-")
+ */
+template <typename ForwardIterator, typename RulenameContext>
+bool advance_rulename (ForwardIterator & pos
+    , ForwardIterator last
+    , RulenameContext * ctx = nullptr)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+
+    auto p = pos;
+
+    if (p == last)
+        return false;
+
+    if (!is_alpha_char(*p))
+        return false;
+
+    ForwardIterator first_pos = p;
+
+    ++p;
+
+    while (p != last
+        && (is_alpha_char(*p)
+            || is_digit_char(*p)
+            || *p == char_type('-'))) {
+        ++p;
+    }
+
+    if (ctx)
+        ctx->rulename(first_pos, p);
+
+    return compare_and_assign(pos, p);
+}
+
+// /**
+//  * @brief Advance by whitespace or comment or new line and whitespace.
+//  *
+//  * @param pos On input - first position, on output - last good position.
+//  * @param last End of sequence position.
+//  * @param ctx Structure satisfying requirements of CommentContext
+//  * @return @c true if advanced by at least one position, otherwise @c false.
+//  *
+//  * @par
+//  * CommentContext {
+//  *     void comment (ForwardIterator first, ForwardIterator last)
+//  * }
+//  *
+//  * @note Grammar
+//  * c-wsp = WSP / (c-nl WSP)
+//  */
+// template <typename ForwardIterator, typename CommentContext>
+// inline bool advance_comment_newline_whitespace (ForwardIterator & pos
+//     , ForwardIterator last
+//     , CommentContext * ctx = nullptr)
+// {
+//     if (p == last)
+//         return false;
+//
+//     if (is_whitespace_char(*p))
+//         ++p;
+//     else
+//
+//     return advance_newline(pos, last)
+//         || advance_comment(pos, last, ctx);
+//     using char_type = typename std::remove_reference<decltype(*pos)>::type;
+// }
+
 // TODO
 // * rulelist
 // * rule
-// * rulename
 // * defined-as
 // * elements
 // * c-wsp
-// * c-nl
 // * alternation
 // * concatenation
 // * repetition

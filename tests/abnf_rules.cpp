@@ -457,5 +457,149 @@ TEST_CASE("advance_comment") {
         CHECK(pos == s.end());
         CHECK(ctx.text == std::string{" comment "});
     }
-
 }
+
+TEST_CASE("advance_comment_newline") {
+    using pfs::parser::abnf::advance_comment_newline;
+
+    std::vector<char> valid_values[] = {
+          {';'}
+        , {';', '\n'}
+        , {';', '\r'}
+        , {';', '\r', '\n'}
+        , {';', 'c', '\r', '\n' }
+        , {';', ' ', 'c', 'o', 'm', 'm', 'e', 'n', 't', '\t', '\n'}
+        , {'\r'}
+        , {'\r', '\n'}
+        , {'\n'}
+    };
+
+    std::vector<char> invalid_values[] = {
+        {'x'}
+    };
+
+    {
+        dummy_comment_context * ctx = nullptr;
+
+        for (auto const & item: valid_values) {
+            auto pos = item.begin();
+            CHECK(advance_comment_newline(pos, item.end(), ctx));
+            CHECK(pos == item.end());
+        }
+
+        for (auto const & item: invalid_values) {
+            auto pos = item.begin();
+            CHECK_FALSE(advance_comment_newline(pos, item.end(), ctx));
+        }
+    }
+}
+
+struct dummy_rulename_context
+{
+    void rulename (forward_iterator first, forward_iterator last) {}
+};
+
+struct rulename_context
+{
+    using forward_iterator = std::string::const_iterator;
+
+    std::string name;
+
+    void rulename (forward_iterator first, forward_iterator last)
+    {
+        name = std::string{first, last};
+    }
+};
+
+TEST_CASE("advance_rulename") {
+    using pfs::parser::abnf::advance_rulename;
+
+    std::vector<char> valid_values[] = {
+          {'A'}
+        , {'A', '1'}
+        , {'A', '1', '-'}
+        , {'A', '-', '1'}
+    };
+
+    std::vector<char> invalid_values[] = {
+          {'1'}
+        , {'-'}
+        , {' '}
+    };
+
+    {
+        dummy_rulename_context * ctx = nullptr;
+
+        for (auto const & item: valid_values) {
+            auto pos = item.begin();
+            CHECK(advance_rulename(pos, item.end(), ctx));
+            CHECK(pos == item.end());
+        }
+
+        for (auto const & item: invalid_values) {
+            auto pos = item.begin();
+            CHECK_FALSE(advance_rulename(pos, item.end(), ctx));
+        }
+    }
+
+//     {
+//         repeat_context ctx;
+//         std::string s {"10"};
+//         auto pos = s.begin();
+//         CHECK(advance_repeat(pos, s.end(), & ctx));
+//         CHECK(pos == s.end());
+//         CHECK(ctx.from == std::string{"10"});
+//         CHECK(ctx.to == ctx.from);
+//     }
+//
+//     {
+//         repeat_context ctx;
+//         std::string s {"10*"};
+//         auto pos = s.begin();
+//         CHECK(advance_repeat(pos, s.end(), & ctx));
+//         CHECK(pos == s.end());
+//         CHECK(ctx.from == std::string{"10"});
+//         CHECK(ctx.to.empty());
+//     }
+//
+//     {
+//         repeat_context ctx;
+//         std::string s {"*10"};
+//         auto pos = s.begin();
+//         CHECK(advance_repeat(pos, s.end(), & ctx));
+//         CHECK(pos == s.end());
+//         CHECK(ctx.from.empty());
+//         CHECK(ctx.to == std::string{"10"});
+//     }
+//
+//     {
+//         repeat_context ctx;
+//         std::string s {"*"};
+//         auto pos = s.begin();
+//         CHECK(advance_repeat(pos, s.end(), & ctx));
+//         CHECK(pos == s.end());
+//         CHECK(ctx.from.empty());
+//         CHECK(ctx.to.empty());
+//     }
+//
+//     {
+//         repeat_context ctx;
+//         std::string s {"10*20"};
+//         auto pos = s.begin();
+//         CHECK(advance_repeat(pos, s.end(), & ctx));
+//         CHECK(pos == s.end());
+//         CHECK(ctx.from == std::string{"10"});
+//         CHECK(ctx.to == std::string{"20"});
+//     }
+//
+//     {
+//         repeat_context ctx;
+//         std::string s {"*x"};
+//         auto pos = s.begin();
+//         CHECK(advance_repeat(pos, s.end(), & ctx));
+//         CHECK_FALSE(pos == s.end());
+//         CHECK(ctx.from.empty());
+//         CHECK(ctx.to.empty());
+//     }
+}
+
