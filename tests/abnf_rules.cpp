@@ -260,8 +260,9 @@ TEST_CASE("advance_quoted_string") {
 
 struct dummy_repeat_context
 {
-    void repeat (forward_iterator fromFirst, forward_iterator fromLast
-        , forward_iterator toFirst, forward_iterator toLast) {}
+    void repeat (forward_iterator first_from, forward_iterator last_from
+        , forward_iterator first_to, forward_iterator last_to)
+    {}
 };
 
 struct repeat_context
@@ -371,4 +372,90 @@ TEST_CASE("advance_repeat") {
         CHECK(ctx.from.empty());
         CHECK(ctx.to.empty());
     }
+}
+
+struct dummy_comment_context
+{
+    void comment (forward_iterator first, forward_iterator last) {}
+};
+
+struct comment_context
+{
+    using forward_iterator = std::string::const_iterator;
+
+    std::string text;
+
+    void comment (forward_iterator first, forward_iterator last)
+    {
+        text = std::string{first, last};
+    }
+};
+
+TEST_CASE("advance_comment") {
+    using pfs::parser::abnf::advance_comment;
+
+    std::vector<char> valid_values[] = {
+          {';'}
+        , {';', '\n'}
+        , {';', '\r'}
+        , {';', '\r', '\n'}
+        , {';', 'c', '\r', '\n' }
+        , {';', ' ', 'c', 'o', 'm', 'm', 'e', 'n', 't', '\t', '\n'}
+    };
+
+    std::vector<char> invalid_values[] = {
+        {'x'}
+    };
+
+    {
+        dummy_comment_context * ctx = nullptr;
+
+        for (auto const & item: valid_values) {
+            auto pos = item.begin();
+            CHECK(advance_comment(pos, item.end(), ctx));
+            CHECK(pos == item.end());
+        }
+
+        for (auto const & item: invalid_values) {
+            auto pos = item.begin();
+            CHECK_FALSE(advance_comment(pos, item.end(), ctx));
+        }
+    }
+
+    {
+        comment_context ctx;
+        std::string s {";"};
+        auto pos = s.begin();
+        CHECK(advance_comment(pos, s.end(), & ctx));
+        CHECK(pos == s.end());
+        CHECK(ctx.text.empty());
+    }
+
+    {
+        comment_context ctx;
+        std::string s {";\r\n"};
+        auto pos = s.begin();
+        CHECK(advance_comment(pos, s.end(), & ctx));
+        CHECK(pos == s.end());
+        CHECK(ctx.text.empty());
+    }
+
+    {
+        comment_context ctx;
+        std::string s {"; comment "};
+        auto pos = s.begin();
+        CHECK(advance_comment(pos, s.end(), & ctx));
+        CHECK(pos == s.end());
+        CHECK(ctx.text == std::string{" comment "});
+    }
+
+    {
+        comment_context ctx;
+        std::string s {"; comment \r\n"};
+        auto pos = s.begin();
+        CHECK(advance_comment(pos, s.end(), & ctx));
+        CHECK(pos == s.end());
+        CHECK(ctx.text == std::string{" comment "});
+    }
+
 }
