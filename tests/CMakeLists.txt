@@ -16,7 +16,7 @@ if (pfs-parser_COVERAGE)
 endif()
 
 # Copy test files to build folder
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION .)
+#file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION .)
 
 set(TEST_NAMES
     core_rules
