@@ -737,3 +737,79 @@ TEST_CASE("advance_element") {
         }
     }
 }
+
+struct dummy_repetition_context
+{
+    // RulenameContext
+    void rulename (forward_iterator first, forward_iterator last) {}
+
+    // NumberContext
+    void first_number(pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
+    void last_number(pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
+    void next_number(pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
+
+    // QuotedStringContext
+    void quoted_string(forward_iterator, forward_iterator) {}
+    void error(error_code) {}
+    size_t max_quoted_string_length() { return 0; }
+
+    // ProseContext
+    void prose(forward_iterator, forward_iterator) {}
+
+    // RepeatContext
+    void repeat (forward_iterator first_from, forward_iterator last_from
+        , forward_iterator first_to, forward_iterator last_to)
+    {}
+};
+
+TEST_CASE("advance_repetition") {
+    using pfs::parser::abnf::advance_repetition;
+
+    std::vector<char> valid_values[] = {
+        // Prose
+          {'<', '>'}
+        , {'*', '<', '>'}
+        , {'1', '*', '<', ' ', '>'}
+        , {'*', '2', '<', '\x20', '>'}
+        , {'1', '*', '2', '<', ' ', '\x3D', ' ', '>'}
+
+        // Number
+        , {'%', 'b', '0', '1', '1'}                     // %b001
+        , {'*', '%', 'b', '0', '1', '1'}                // %b001
+        , {'1', '*', '%', 'b', '0', '-', '1'}           // %b0-1
+        , {'*', '2', '%', 'b', '0', '0', '-', '1', '1'} // %b00-11
+        , {'1', '*', '2', '%', 'b', '0', '.', '1', '.', '1', '1'} // %b0.1.11
+
+        // Quoted string
+        , {'"', '"'}
+        , {'*', '"', '"'}
+        , {'1', '*', '"', ' ', '"'}
+        , {'*', '2', '"', '\x21', ' ', '\x7E', '"'}
+        , {'1', '*', '2', '"', '\x21', ' ', '\x7E', '"'}
+
+        // Rulename
+        , {'A'}
+        , {'*', 'A'}
+        , {'1', '*', 'A', '1'}
+        , {'*', '2', 'A', '1', '-'}
+        , {'1', '*', '2', 'A', '-', '1'}
+    };
+
+    std::vector<char> invalid_values[] = {
+    };
+
+    {
+        dummy_repetition_context * ctx = nullptr;
+
+        for (auto const & item : valid_values) {
+            auto pos = item.begin();
+            CHECK(advance_repetition(pos, item.end(), ctx));
+            CHECK(pos == item.end());
+        }
+
+        for (auto const & item : invalid_values) {
+            auto pos = item.begin();
+            CHECK_FALSE(advance_repetition(pos, item.end(), ctx));
+        }
+    }
+}

@@ -609,12 +609,10 @@ bool advance_element (ForwardIterator & pos
     , ForwardIterator last
     , ElementContext * ctx = nullptr)
 {
-    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+    if (pos == last)
+        return false;
 
     auto p = pos;
-
-    if (p == last)
-        return false;
 
     return advance_rulename(pos, last, ctx)
         || advance_group(pos, last, ctx)
@@ -622,6 +620,37 @@ bool advance_element (ForwardIterator & pos
         || advance_number(pos, last, ctx)
         || advance_quoted_string(pos, last, ctx)
         || advance_prose(pos, last, ctx);
+}
+
+/**
+ * @brief Advance by repetition.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of RepetitonContext
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * RepetitonContext extends RepeatContext
+ *      , ElementContext
+ * { }
+ *
+ * @note Grammar
+ * repetition = [repeat] element
+ */
+template <typename ForwardIterator, typename RepetitonContext>
+bool advance_repetition (ForwardIterator & pos
+    , ForwardIterator last
+    , RepetitonContext * ctx = nullptr)
+{
+    if (pos == last)
+        return false;
+
+    auto p = pos;
+
+    advance_repeat(pos, last, ctx);
+
+    return advance_element(pos, last, ctx);
 }
 
 /**
@@ -682,7 +711,6 @@ bool advance_option (ForwardIterator &
 // * rulelist
 // * rule
 // * defined-as
-// * elements
 // * c-wsp
 // * alternation
 // * concatenation
