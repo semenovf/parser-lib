@@ -578,12 +578,12 @@ bool advance_rulename (ForwardIterator & pos
 template <typename ForwardIterator, typename GroupContext>
 bool advance_group (ForwardIterator &
     , ForwardIterator
-    , GroupContext * ctx);
+    , GroupContext * = nullptr);
 
 template <typename ForwardIterator, typename OptionContext>
 bool advance_option (ForwardIterator &
     , ForwardIterator
-    , OptionContext * ctx);
+    , OptionContext * = nullptr);
 
 /**
  * @brief Advance by element.
@@ -595,10 +595,10 @@ bool advance_option (ForwardIterator &
  *
  * @par
  * ElementContext extends RulenameContext
- *      , GroupContext 
+ *      , GroupContext
  *      , OptionContext
- *      , QuotedStringContext 
- *      , NumberContext 
+ *      , QuotedStringContext
+ *      , NumberContext
  *      , ProseContext { }
  *
  * @note Grammar
@@ -627,18 +627,18 @@ bool advance_element (ForwardIterator & pos
 /**
  */
 template <typename ForwardIterator, typename GroupContext>
-bool advance_group(ForwardIterator &
+bool advance_group (ForwardIterator &
     , ForwardIterator
-    , GroupContext * ctx = nullptr)
+    , GroupContext * ctx)
 {
     // TODO Implement
     return false;
 }
 
 template <typename ForwardIterator, typename OptionContext>
-bool advance_option(ForwardIterator &
+bool advance_option (ForwardIterator &
     , ForwardIterator
-    , OptionContext * ctx = nullptr)
+    , OptionContext * ctx)
 {
     // TODO Implement
     return false;
@@ -687,7 +687,6 @@ bool advance_option(ForwardIterator &
 // * alternation
 // * concatenation
 // * repetition
-// * element
 // * group
 // * option
 
