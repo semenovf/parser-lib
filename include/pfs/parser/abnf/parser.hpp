@@ -525,6 +525,40 @@ inline bool advance_comment_newline (ForwardIterator & pos
 }
 
 /**
+ * @brief Advance by white space or group of comment or new line with white space.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of CommentContext
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @note Grammar
+ * c-wsp =  WSP / (c-nl WSP)
+ */
+template <typename ForwardIterator, typename CommentContext>
+inline bool advance_comment_whitespace (ForwardIterator & pos
+    , ForwardIterator last
+    , CommentContext * ctx = nullptr)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+
+    if (pos == last)
+        return false;
+
+    auto p = pos;
+
+    if (is_whitespace_char(*p)) {
+        ++p;
+    } else if (advance_comment_newline(p, last, ctx) && is_whitespace_char(*p)) {
+        ++p;
+    } else {
+        return false;
+    }
+
+    return compare_and_assign(pos, p);
+}
+
+/**
  * @brief Advance by rule name.
  *
  * @param pos On input - first position, on output - last good position.
@@ -547,10 +581,10 @@ bool advance_rulename (ForwardIterator & pos
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
-    auto p = pos;
-
-    if (p == last)
+    if (pos == last)
         return false;
+
+    auto p = pos;
 
     if (!is_alpha_char(*p))
         return false;
@@ -627,7 +661,7 @@ bool advance_element (ForwardIterator & pos
  *
  * @param pos On input - first position, on output - last good position.
  * @param last End of sequence position.
- * @param ctx Structure satisfying requirements of RepetitonContext
+ * @param ctx Structure satisfying requirements of RepetitionContext
  * @return @c true if advanced by at least one position, otherwise @c false.
  *
  * @par
@@ -638,10 +672,10 @@ bool advance_element (ForwardIterator & pos
  * @note Grammar
  * repetition = [repeat] element
  */
-template <typename ForwardIterator, typename RepetitonContext>
+template <typename ForwardIterator, typename RepetitionContext>
 bool advance_repetition (ForwardIterator & pos
     , ForwardIterator last
-    , RepetitonContext * ctx = nullptr)
+    , RepetitionContext * ctx = nullptr)
 {
     if (pos == last)
         return false;
@@ -649,6 +683,39 @@ bool advance_repetition (ForwardIterator & pos
     auto p = pos;
 
     advance_repeat(pos, last, ctx);
+
+    return advance_element(pos, last, ctx);
+}
+
+/**
+ * @brief Advance by repetition.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of ConcatenationContext
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * RepetitonContext extends RepetitionContext
+ * { }
+ *
+ * @note Grammar
+ * concatenation = repetition *(1*c-wsp repetition)
+ */
+template <typename ForwardIterator, typename ConcatenationContext>
+bool advance_concatenation (ForwardIterator & pos
+    , ForwardIterator last
+    , ConcatenationContext * ctx = nullptr)
+{
+    if (pos == last)
+        return false;
+
+    auto p = pos;
+
+    if (!advance_repetition(pos, last, ctx))
+        return false;
+
+
 
     return advance_element(pos, last, ctx);
 }
@@ -711,10 +778,8 @@ bool advance_option (ForwardIterator &
 // * rulelist
 // * rule
 // * defined-as
-// * c-wsp
 // * alternation
 // * concatenation
-// * repetition
 // * group
 // * option
 

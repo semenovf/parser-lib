@@ -500,6 +500,43 @@ TEST_CASE("advance_comment_newline") {
     }
 }
 
+TEST_CASE("advance_comment_whitespace") {
+    using pfs::parser::abnf::advance_comment_whitespace;
+
+    std::vector<char> valid_values[] = {
+          {' '}
+        , {'\t'}
+        , {';', '\n', ' '}
+        , {';', '\n', '\t'}
+        , {';', '\r', ' '}
+        , {';', '\r', '\t'}
+        , {';', '\r', '\n', ' '}
+        , {';', 'c', '\r', '\n', '\t' }
+        , {';', ' ', 'c', 'o', 'm', 'm', 'e', 'n', 't', '\t', '\n', ' '}
+    };
+
+    std::vector<char> invalid_values[] = {
+          {'x'}
+        , {';'}
+        , {';', '\n'}
+    };
+
+    {
+        dummy_comment_context * ctx = nullptr;
+
+        for (auto const & item: valid_values) {
+            auto pos = item.begin();
+            CHECK(advance_comment_whitespace(pos, item.end(), ctx));
+            CHECK(pos == item.end());
+        }
+
+        for (auto const & item: invalid_values) {
+            auto pos = item.begin();
+            CHECK_FALSE(advance_comment_whitespace(pos, item.end(), ctx));
+        }
+    }
+}
+
 struct dummy_rulename_context
 {
     void rulename (forward_iterator first, forward_iterator last) {}
