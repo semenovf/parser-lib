@@ -10,6 +10,7 @@
 
 #include "error.hpp"
 #include "pfs/parser/core_rules.hpp"
+#include "pfs/parser/generator.hpp"
 #include <bitset>
 // #include <functional>
 // #include <iterator>
@@ -667,7 +668,10 @@ bool advance_element (ForwardIterator & pos
  * @par
  * RepetitonContext extends RepeatContext
  *      , ElementContext
- * { }
+ * {
+ *      void begin_repetition ()
+ *      void end_repetition (bool success)
+ * }
  *
  * @note Grammar
  * repetition = [repeat] element
@@ -682,13 +686,21 @@ bool advance_repetition (ForwardIterator & pos
 
     auto p = pos;
 
+    if (ctx)
+        ctx->begin_repetition();
+
     advance_repeat(pos, last, ctx);
 
-    return advance_element(pos, last, ctx);
+    auto success = advance_element(pos, last, ctx);
+
+    if (ctx)
+        ctx->end_repetition(success);
+
+    return success;
 }
 
 /**
- * @brief Advance by repetition.
+ * @brief Advance by concatenation.
  *
  * @param pos On input - first position, on output - last good position.
  * @param last End of sequence position.
@@ -696,8 +708,11 @@ bool advance_repetition (ForwardIterator & pos
  * @return @c true if advanced by at least one position, otherwise @c false.
  *
  * @par
- * RepetitonContext extends RepetitionContext
- * { }
+ * ConcatenationContext extends RepetitionContext
+ * {
+ *      void begin_concatenation ()
+ *      void end_concatenation (bool success)
+ * }
  *
  * @note Grammar
  * concatenation = repetition *(1*c-wsp repetition)
@@ -712,19 +727,63 @@ bool advance_concatenation (ForwardIterator & pos
 
     auto p = pos;
 
-    if (!advance_repetition(pos, last, ctx))
-        return false;
+    if (ctx)
+        ctx->begin_concatenation();
+
+    bool success = false;
+
+    do {
+        // At least one repetition need
+        if (!advance_repetition(pos, last, ctx))
+            break;
+
+        for (int i = 0; ; i++) {
+            // Must be at least one 'c-wsp'
+            for (int i = 0; i < 1; i++) {
+                if (!advance_comment_whitespace(pos, last, ctx))
+                    break;
+            }
+        }
 
 
+        success = true;
+    } while(false);
 
-    return advance_element(pos, last, ctx);
+    if (ctx)
+        ctx->end_concatenation(success);
+
+    return success;
+}
+
+/**
+ * @brief Advance by alternation.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of AlternationContext
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * AlternationContext extends ConcatenationContext
+ * { }
+ *
+ * @note Grammar
+ * alternation = concatenation *(*c-wsp "/" *c-wsp concatenation)
+ */
+template <typename ForwardIterator, typename AlternationContext>
+bool advance_alternation (ForwardIterator & pos
+    , ForwardIterator last
+    , AlternationContext * ctx = nullptr)
+{
+    // TODO Implement
+    return false;
 }
 
 /**
  */
 template <typename ForwardIterator, typename GroupContext>
-bool advance_group (ForwardIterator &
-    , ForwardIterator
+bool advance_group (ForwardIterator & pos
+    , ForwardIterator last
     , GroupContext * ctx)
 {
     // TODO Implement
@@ -732,54 +791,19 @@ bool advance_group (ForwardIterator &
 }
 
 template <typename ForwardIterator, typename OptionContext>
-bool advance_option (ForwardIterator &
-    , ForwardIterator
+bool advance_option (ForwardIterator & pos
+    , ForwardIterator last
     , OptionContext * ctx)
 {
     // TODO Implement
     return false;
 }
 
-
-// /**
-//  * @brief Advance by whitespace or comment or new line and whitespace.
-//  *
-//  * @param pos On input - first position, on output - last good position.
-//  * @param last End of sequence position.
-//  * @param ctx Structure satisfying requirements of CommentContext
-//  * @return @c true if advanced by at least one position, otherwise @c false.
-//  *
-//  * @par
-//  * CommentContext {
-//  *     void comment (ForwardIterator first, ForwardIterator last)
-//  * }
-//  *
-//  * @note Grammar
-//  * c-wsp = WSP / (c-nl WSP)
-//  */
-// template <typename ForwardIterator, typename CommentContext>
-// inline bool advance_comment_newline_whitespace (ForwardIterator & pos
-//     , ForwardIterator last
-//     , CommentContext * ctx = nullptr)
-// {
-//     if (p == last)
-//         return false;
-//
-//     if (is_whitespace_char(*p))
-//         ++p;
-//     else
-//
-//     return advance_newline(pos, last)
-//         || advance_comment(pos, last, ctx);
-//     using char_type = typename std::remove_reference<decltype(*pos)>::type;
-// }
-
 // TODO
 // * rulelist
 // * rule
 // * defined-as
 // * alternation
-// * concatenation
 // * group
 // * option
 

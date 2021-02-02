@@ -11,6 +11,7 @@ option(${_project_basename}_ENABLE_COVERAGE "Build tests with coverage support" 
 #file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION .)
 
 set(TEST_NAMES
+    generator
     core_rules
     abnf_rules)
 
