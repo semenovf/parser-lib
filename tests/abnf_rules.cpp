@@ -833,6 +833,7 @@ TEST_CASE("advance_repetition") {
     };
 
     std::vector<char> invalid_values[] = {
+          {' '}
     };
 
     {
