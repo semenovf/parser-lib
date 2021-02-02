@@ -96,7 +96,7 @@ matrix:
     env:
       - COMPILER=g++-7
       - CXX_STANDARD=11
-      - CMAKE_OPTIONS=-Dpfs-parser_COVERAGE=ON
+      - CMAKE_OPTIONS=-Dpfs-parser_ENABLE_COVERAGE=ON
       - BUILD_TYPE=Debug
 
 before_script:
