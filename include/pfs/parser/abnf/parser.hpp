@@ -12,15 +12,7 @@
 #include "pfs/parser/core_rules.hpp"
 #include "pfs/parser/generator.hpp"
 #include <bitset>
-// #include <functional>
-// #include <iterator>
-// #include <memory>
-// #include <string>
 #include <type_traits>
-// #include <utility>
-// #include <cassert>
-// #include <clocale>
-// #include <cstdlib>
 
 namespace pfs {
 namespace parser {
@@ -709,6 +701,7 @@ bool advance_repetition (ForwardIterator & pos
  *
  * @par
  * ConcatenationContext extends RepetitionContext
+ *      , CommentContext
  * {
  *      void begin_concatenation ()
  *      void end_concatenation (bool success)
@@ -725,34 +718,32 @@ bool advance_concatenation (ForwardIterator & pos
     if (pos == last)
         return false;
 
-    auto p = pos;
-
     if (ctx)
         ctx->begin_concatenation();
 
-    bool success = false;
+    // At least one repetition need
+    if (!advance_repetition(pos, last, ctx))
+        return false;
 
-    do {
-        // At least one repetition need
-        if (!advance_repetition(pos, last, ctx))
-            break;
+    // *(1*c-wsp repetition)
+    return advance_repetition_by_range(pos, last, unlimited_range()
+        , [ctx] (ForwardIterator & pos, ForwardIterator last) -> bool {
 
-        for (int i = 0; ; i++) {
-            // Must be at least one 'c-wsp'
-            for (int i = 0; i < 1; i++) {
-                if (!advance_comment_whitespace(pos, last, ctx))
-                    break;
+            auto p = pos;
+
+            // 1*c-wsp
+            if (! advance_repetition_by_range(p, last, make_range(1)
+                    , [ctx] (ForwardIterator & pos, ForwardIterator last) -> bool {
+                        return advance_comment_whitespace(pos, last, ctx);
+                    })) {
+                return false;
             }
-        }
 
+            if (! advance_repetition(p, last, ctx))
+                return false;
 
-        success = true;
-    } while(false);
-
-    if (ctx)
-        ctx->end_concatenation(success);
-
-    return success;
+            return compare_and_assign(pos, p);
+        });
 }
 
 /**

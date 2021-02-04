@@ -14,6 +14,12 @@
 using pfs::parser::error_code;
 using forward_iterator = std::vector<char>::const_iterator;
 
+struct test_item {
+    bool success;
+    int distance;
+    std::vector<char> data;
+};
+
 TEST_CASE("is_prose_value_char") {
     using pfs::parser::abnf::is_prose_value_char;
 
@@ -824,59 +830,34 @@ TEST_CASE("advance_repetition") {
     }
 }
 
-// struct dummy_concatenation_context: dummy_repetition_context
-// {};
-//
-//
-// TEST_CASE("advance_concatenation") {
-//     using pfs::parser::abnf::advance_concatenation;
-//
-//     std::vector<char> valid_values[0]/* = {
-//         // Prose
-//           {'<', '>'}
-//         , {'*', '<', '>'}
-//         , {'1', '*', '<', ' ', '>'}
-//         , {'*', '2', '<', '\x20', '>'}
-//         , {'1', '*', '2', '<', ' ', '\x3D', ' ', '>'}
-//
-//         // Number
-//         , {'%', 'b', '0', '1', '1'}                     // %b001
-//         , {'*', '%', 'b', '0', '1', '1'}                // %b001
-//         , {'1', '*', '%', 'b', '0', '-', '1'}           // %b0-1
-//         , {'*', '2', '%', 'b', '0', '0', '-', '1', '1'} // %b00-11
-//         , {'1', '*', '2', '%', 'b', '0', '.', '1', '.', '1', '1'} // %b0.1.11
-//
-//         // Quoted string
-//         , {'"', '"'}
-//         , {'*', '"', '"'}
-//         , {'1', '*', '"', ' ', '"'}
-//         , {'*', '2', '"', '\x21', ' ', '\x7E', '"'}
-//         , {'1', '*', '2', '"', '\x21', ' ', '\x7E', '"'}
-//
-//         // Rulename
-//         , {'A'}
-//         , {'*', 'A'}
-//         , {'1', '*', 'A', '1'}
-//         , {'*', '2', 'A', '1', '-'}
-//         , {'1', '*', '2', 'A', '-', '1'}
-//     }*/;
-//
-//     std::vector<char> invalid_values[0]/* = {
-//           {' '}
-//     }*/;
-//
-//     {
-//         dummy_concatenation_context * ctx = nullptr;
-//
-//         for (auto const & item : valid_values) {
-//             auto pos = item.begin();
-//             CHECK(advance_concatenation(pos, item.end(), ctx));
-//             CHECK(pos == item.end());
-//         }
-//
-//         for (auto const & item : invalid_values) {
-//             auto pos = item.begin();
-//             CHECK_FALSE(advance_concatenation(pos, item.end(), ctx));
-//         }
-//     }
-// }
+struct dummy_concatenation_context
+    : dummy_repetition_context
+    , dummy_comment_context
+{
+    void begin_concatenation () {}
+    void end_concatenation (bool ) {}
+};
+
+TEST_CASE("advance_concatenation") {
+    using pfs::parser::abnf::advance_concatenation;
+
+    std::vector<test_item> test_values = {
+          { true, 1, {'a'} }
+        , { true, 1, {'a', ' '} }
+        , { true, 3, {'a', ' ', 'b'} }
+        , { true, 4, {'a', ' ', '\t', 'b'} }
+    };
+
+    dummy_concatenation_context * ctx = nullptr;
+
+    for (auto const & item : test_values) {
+        auto first = item.data.begin();
+        auto last = item.data.end();
+        auto pos = first;
+
+        auto result = advance_concatenation(pos, last, ctx);
+
+        CHECK(result == item.success);
+        CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
+    }
+}

@@ -15,18 +15,20 @@
 
 using forward_iterator = std::vector<char>::const_iterator;
 
-TEST_CASE("advance_repetition") {
+TEST_CASE("advance_repetition_by_range") {
     using pfs::parser::is_alpha_char;
-    using pfs::parser::advance_repetition;
+    using pfs::parser::advance_repetition_by_range;
 
     struct test_item {
+        bool success;
+        int distance;
         std::vector<char> data;
         std::pair<int, int> range;
-        int distance;
     };
 
     std::vector<test_item> test_values = {
-        { {'a'}, {0, 1}, 1 }
+          { true, 1, {'a'}, {0, 1} }
+        , { true, 2, {'a', 'b'}, {1, 2} }
     };
 
     for (auto const & item : test_values) {
@@ -34,7 +36,7 @@ TEST_CASE("advance_repetition") {
         auto last = item.data.end();
         auto pos = first;
 
-        auto result = advance_repetition(pos, last, item.range
+        auto result = advance_repetition_by_range(pos, last, item.range
             , [] (forward_iterator & first, forward_iterator last) {
                 if (is_alpha_char(*first)) {
                     ++first;
@@ -43,7 +45,7 @@ TEST_CASE("advance_repetition") {
                 return false;
             });
 
-        CHECK(result);
+        CHECK(result == item.success);
         CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
     }
 }

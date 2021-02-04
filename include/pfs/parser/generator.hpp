@@ -7,10 +7,26 @@
 //      2021.02.02 Initial version
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
+#include <limits>
 #include <utility>
 
 namespace pfs {
 namespace parser {
+
+using repeat_range = std::pair<int, int>;
+
+inline repeat_range make_range (
+      repeat_range::first_type lower_bound = repeat_range::first_type{0}
+    , repeat_range::second_type upper_bound = repeat_range::first_type{
+            std::numeric_limits<repeat_range::second_type>::max()})
+{
+    return std::make_pair(lower_bound, upper_bound);
+}
+
+inline repeat_range unlimited_range ()
+{
+    return make_range();
+}
 
 /**
  * @brief Advance by repetition.
@@ -23,7 +39,7 @@ namespace parser {
  * @return @c true if advanced by at least one position, otherwise @c false.
  */
 template <typename ForwardIterator, typename RepetitionOp>
-bool advance_repetition (ForwardIterator & pos
+bool advance_repetition_by_range (ForwardIterator & pos
     , ForwardIterator last
     , std::pair<int, int> const & range
     , RepetitionOp op)
@@ -49,4 +65,4 @@ bool advance_repetition (ForwardIterator & pos
     return true;
 }
 
-}} // namespace
+}} // namespace pfs::parser
