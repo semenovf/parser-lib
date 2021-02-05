@@ -766,8 +766,39 @@ bool advance_alternation (ForwardIterator & pos
     , ForwardIterator last
     , AlternationContext * ctx = nullptr)
 {
-    // TODO Implement
-    return false;
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+
+    if (pos == last)
+        return false;
+
+    if (! advance_concatenation(pos, last, ctx))
+        return false;
+
+    // _________________________________________________
+    // |                                               |
+    // *(*c-wsp "/" *c-wsp concatenation)              v
+    return advance_repetition_by_range(pos, last, unlimited_range()
+        , [ctx] (ForwardIterator & pos, ForwardIterator last) -> bool {
+            auto p = pos;
+
+            // *c-wsp
+            while (advance_comment_whitespace(p, last, ctx))
+                ;
+
+            if (*p != char_type('/'))
+                return false;
+
+            ++p;
+
+            // *c-wsp
+            while (advance_comment_whitespace(p, last, ctx))
+                ;
+
+            if (! advance_concatenation(p, last, ctx))
+                return false;
+
+            return compare_and_assign(pos, p);
+        });
 }
 
 /**

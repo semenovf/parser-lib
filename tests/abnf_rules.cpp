@@ -861,3 +861,34 @@ TEST_CASE("advance_concatenation") {
         CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
     }
 }
+
+struct dummy_alternation_context
+    : dummy_concatenation_context
+{};
+
+TEST_CASE("advance_alternation") {
+    using pfs::parser::abnf::advance_alternation;
+
+    std::vector<test_item> test_values = {
+          { true, 1, {'a'} }
+        , { true, 1, {'a', ' '} }
+        , { true, 3, {'a', ' ', 'b'} }
+        , { true, 4, {'a', ' ', '\t', 'b'} }
+        , { true, 3, {'a', '/', 'b'} }
+        , { true, 4, {'a', '/', '\t', 'b'} }
+        , { true, 5, {'a', ' ', '/', '\t', 'b'} }
+    };
+
+    dummy_alternation_context * ctx = nullptr;
+
+    for (auto const & item : test_values) {
+        auto first = item.data.begin();
+        auto last = item.data.end();
+        auto pos = first;
+
+        auto result = advance_alternation(pos, last, ctx);
+
+        CHECK(result == item.success);
+        CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
+    }
+}
