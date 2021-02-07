@@ -1039,8 +1039,47 @@ bool advance_rule (ForwardIterator & pos
     return compare_and_assign(pos, p);
 }
 
-// TODO
-// * rulelist
+/**
+ * @brief Advance by @c rulelist.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of RulelistContext
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * RulelistContext extends RuleContext
+ *      , CommentContext
+ * {}
+ *
+ * @note Grammar
+ * rulelist = 1*( rule / (*c-wsp c-nl) )
+ */
+template <typename ForwardIterator, typename RulelistContext>
+bool advance_rulelist (ForwardIterator & pos
+    , ForwardIterator last
+    , RulelistContext * ctx = nullptr)
+{
+    return advance_repetition_by_range(pos, last, make_range(1)
+        , [ctx] (ForwardIterator & pos, ForwardIterator last) -> bool {
 
+            auto p = pos;
+
+            if (advance_rule(p, last, ctx)) {
+                ;
+            } else {
+                // *c-wsp
+                while (advance_comment_whitespace(pos, last, ctx))
+                    ;
+
+                if (p != last) {
+                    if (!advance_comment_newline(p, last, ctx))
+                        return false;
+                }
+            }
+
+            return compare_and_assign(pos, p);
+        });
+}
 
 }}} // // namespace pfs::parser::abnf

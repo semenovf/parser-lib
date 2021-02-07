@@ -1044,3 +1044,34 @@ TEST_CASE("advance_rule") {
         CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
     }
 }
+
+struct dummy_rulelist_context
+    : dummy_rule_context
+    , public virtual dummy_comment_context
+{};
+
+TEST_CASE("advance_rulelist") {
+    using pfs::parser::abnf::advance_rulelist;
+
+    std::vector<test_item> test_values = {
+          { true, 9, {'r', ' ', '=', ' ', '[', 'p', ']', ' ', 'e'} }
+
+        , { true, 34, {'r', 'e', 'p', 'e', 't', 'i', 't', 'i', 'o', 'n'
+                , ' ', ' ', ' ', ' ', ' ', '=', ' ', ' ', '[', 'r', 'e'
+                , 'p', 'e', 'a', 't', ']', ' ', 'e', 'l', 'e', 'm', 'e'
+                , 'n', 't'} }
+    };
+
+    dummy_rulelist_context * ctx = nullptr;
+
+    for (auto const & item : test_values) {
+        auto first = item.data.begin();
+        auto last = item.data.end();
+        auto pos = first;
+
+        auto result = advance_rulelist(pos, last, ctx);
+
+        CHECK(result == item.success);
+        CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
+    }
+}
