@@ -934,3 +934,29 @@ TEST_CASE("advance_group") {
         CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
     }
 }
+
+struct dummy_option_context
+    : dummy_alternation_context
+{};
+
+TEST_CASE("advance_group") {
+    using pfs::parser::abnf::advance_option;
+
+    std::vector<test_item> test_values = {
+          { false, 0, {'[', ']'} }
+        , { true , 3, {'[', 'a', ']'} }
+    };
+
+    dummy_option_context * ctx = nullptr;
+
+    for (auto const & item : test_values) {
+        auto first = item.data.begin();
+        auto last = item.data.end();
+        auto pos = first;
+
+        auto result = advance_option(pos, last, ctx);
+
+        CHECK(result == item.success);
+        CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
+    }
+}

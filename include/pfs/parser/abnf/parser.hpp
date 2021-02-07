@@ -801,34 +801,29 @@ bool advance_alternation (ForwardIterator & pos
         });
 }
 
-/**
- * @brief Advance by group.
+/* Helper function
  *
- * @param pos On input - first position, on output - last good position.
- * @param last End of sequence position.
- * @param ctx Structure satisfying requirements of GroupContext
- * @return @c true if advanced by at least one position, otherwise @c false.
- *
- * @par
- * GroupContext extends AlternationContext
- * { }
- *
- * @note Grammar
- * "(" *c-wsp alternation *c-wsp ")"
+ * Grammar
+ * group  = "(" *c-wsp alternation *c-wsp ")"
+ * option = "[" *c-wsp alternation *c-wsp "]"
  */
 template <typename ForwardIterator, typename GroupContext>
-bool advance_group (ForwardIterator & pos
+bool advance_group_or_option (ForwardIterator & pos
     , ForwardIterator last
+    , bool is_group
     , GroupContext * ctx)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
+
+    char_type opening_bracket = is_group ? char_type('(') : char_type('[');
+    char_type closing_bracket = is_group ? char_type(')') : char_type(']');
 
     if (pos == last)
         return false;
 
     auto p = pos;
 
-    if (*p != char_type('('))
+    if (*p != opening_bracket)
         return false;
 
     ++p;
@@ -847,7 +842,7 @@ bool advance_group (ForwardIterator & pos
     while (advance_comment_whitespace(p, last, ctx))
         ;
 
-    if (*p != char_type(')'))
+    if (*p != closing_bracket)
         return false;
 
     ++p;
@@ -855,21 +850,56 @@ bool advance_group (ForwardIterator & pos
     return compare_and_assign(pos, p);;
 }
 
+/**
+ * @brief Advance by group.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of GroupContext
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * GroupContext extends AlternationContext
+ * { }
+ *
+ * @note Grammar
+ * group  = "(" *c-wsp alternation *c-wsp ")"
+ */
+template <typename ForwardIterator, typename GroupContext>
+bool advance_group (ForwardIterator & pos
+    , ForwardIterator last
+    , GroupContext * ctx)
+{
+    return advance_group_or_option(pos, last, true, ctx);
+}
+
+/**
+ * @brief Advance by option.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of OptionContext
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * OptionContext extends AlternationContext
+ * { }
+ *
+ * @note Grammar
+ * option = "[" *c-wsp alternation *c-wsp "]"
+ */
 template <typename ForwardIterator, typename OptionContext>
 bool advance_option (ForwardIterator & pos
     , ForwardIterator last
     , OptionContext * ctx)
 {
-    // TODO Implement
-    return false;
+    return advance_group_or_option(pos, last, false, ctx);
 }
 
 // TODO
 // * rulelist
 // * rule
 // * defined-as
-// * group
-// * option
 
 ////////////////////////////////////////////////////////////////////////////////
 // advance_rule
