@@ -657,7 +657,25 @@ struct dummy_element_context
     , dummy_number_context
     , dummy_quoted_string_context
     , dummy_prose_context
-{};
+{
+    // Below are requirements for GroupContext and OptionContext
+
+    // ConcatenationContext
+    void begin_concatenation () {}
+    void end_concatenation (bool ) {}
+
+    // RepetitionContext
+    void begin_repetition () {}
+    void end_repetition (bool) {}
+
+    // RepeatContext
+    void repeat (forward_iterator first_from, forward_iterator last_from
+        , forward_iterator first_to, forward_iterator last_to)
+    {}
+
+    // CommentContext
+    void comment (forward_iterator first, forward_iterator last) {}
+};
 
 TEST_CASE("advance_element") {
     using pfs::parser::abnf::advance_element;
@@ -771,7 +789,6 @@ TEST_CASE("advance_element") {
 
 struct dummy_repetition_context
     : dummy_element_context
-    , dummy_repeat_context
 {
     void begin_repetition () {}
     void end_repetition (bool) {}
@@ -832,7 +849,6 @@ TEST_CASE("advance_repetition") {
 
 struct dummy_concatenation_context
     : dummy_repetition_context
-    , dummy_comment_context
 {
     void begin_concatenation () {}
     void end_concatenation (bool ) {}
@@ -887,6 +903,32 @@ TEST_CASE("advance_alternation") {
         auto pos = first;
 
         auto result = advance_alternation(pos, last, ctx);
+
+        CHECK(result == item.success);
+        CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
+    }
+}
+
+struct dummy_group_context
+    : dummy_alternation_context
+{};
+
+TEST_CASE("advance_group") {
+    using pfs::parser::abnf::advance_group;
+
+    std::vector<test_item> test_values = {
+          { false, 0, {'(', ')'} }
+        , { true , 3, {'(', 'a', ')'} }
+    };
+
+    dummy_group_context * ctx = nullptr;
+
+    for (auto const & item : test_values) {
+        auto first = item.data.begin();
+        auto last = item.data.end();
+        auto pos = first;
+
+        auto result = advance_group(pos, last, ctx);
 
         CHECK(result == item.success);
         CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
