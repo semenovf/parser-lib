@@ -8,12 +8,13 @@ project(${_project_basename}_TESTS)
 option(${_project_basename}_ENABLE_COVERAGE "Build tests with coverage support" OFF)
 
 # Copy test files to build folder
-#file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION .)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION .)
 
 set(TEST_NAMES
     generator
     core_rules
-    abnf_rules)
+    abnf_rules
+    parse_files)
 
 foreach (name ${TEST_NAMES})
     if (${name}_SOURCES)

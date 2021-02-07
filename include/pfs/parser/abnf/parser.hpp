@@ -5,6 +5,7 @@
 //
 // Changelog:
 //      2021.01.16 Initial version
+//      2021.02.07 Alpha release
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
@@ -499,11 +500,6 @@ bool advance_comment (ForwardIterator & pos
  * @param ctx Structure satisfying requirements of CommentContext
  * @return @c true if advanced by at least one position, otherwise @c false.
  *
- * @par
- * CommentContext {
- *     void comment (ForwardIterator first, ForwardIterator last)
- * }
- *
  * @note Grammar
  * c-nl = comment / CRLF ; comment or newline
  */
@@ -639,8 +635,6 @@ bool advance_element (ForwardIterator & pos
     if (pos == last)
         return false;
 
-    auto p = pos;
-
     return advance_rulename(pos, last, ctx)
         || advance_group(pos, last, ctx)
         || advance_option(pos, last, ctx)
@@ -658,7 +652,7 @@ bool advance_element (ForwardIterator & pos
  * @return @c true if advanced by at least one position, otherwise @c false.
  *
  * @par
- * RepetitonContext extends RepeatContext
+ * RepetitionContext extends RepeatContext
  *      , ElementContext
  * {
  *      void begin_repetition ()

@@ -997,6 +997,9 @@ TEST_CASE("advance_elements") {
     std::vector<test_item> test_values = {
           { true, 2, {'a', ' '} }
         , { true, 4, {'a', ';', '\n', '\t'} }
+        , { true, 26, {'1', '*', '(', ' ', 'r', 'u', 'l', 'e', ' ', '/', ' '
+                , '(', '*', 'c', '-', 'w', 's', 'p', ' ', 'c', '-', 'n', 'l'
+                , ')', ' ', ')'} }
     };
 
     dummy_elements_context * ctx = nullptr;
