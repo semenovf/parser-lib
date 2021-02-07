@@ -960,3 +960,35 @@ TEST_CASE("advance_group") {
         CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
     }
 }
+
+struct dummy_defined_as_context
+    : dummy_comment_context
+{
+    void accept_basic_rule_definition () {}
+    void accept_incremental_alternatives () {}
+};
+
+TEST_CASE("advance_defined_as") {
+    using pfs::parser::abnf::advance_defined_as;
+
+    std::vector<test_item> test_values = {
+          { true, 1, {'='} }
+        , { true, 2, {'=', '/'} }
+        , { true, 3, {' ', '=', '/'} }
+        , { true, 4, {' ', '=', '/', '\t'} }
+        , { true, 8, {';', '\n', '\t', '=', '/', ';', '\n', ' '} }
+    };
+
+    dummy_defined_as_context * ctx = nullptr;
+
+    for (auto const & item : test_values) {
+        auto first = item.data.begin();
+        auto last = item.data.end();
+        auto pos = first;
+
+        auto result = advance_defined_as(pos, last, ctx);
+
+        CHECK(result == item.success);
+        CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
+    }
+}

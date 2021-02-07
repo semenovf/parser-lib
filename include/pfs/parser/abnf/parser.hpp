@@ -847,7 +847,7 @@ bool advance_group_or_option (ForwardIterator & pos
 
     ++p;
 
-    return compare_and_assign(pos, p);;
+    return compare_and_assign(pos, p);
 }
 
 /**
@@ -896,10 +896,76 @@ bool advance_option (ForwardIterator & pos
     return advance_group_or_option(pos, last, false, ctx);
 }
 
+/**
+ * @brief Advance by defined-as.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of DefinedAsContext
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * DefinedAsContext extends CommentContext
+ * {
+ *      void accept_basic_rule_definition ();
+ *      void accept_incremental_alternatives ();
+ * }
+ *
+ * @note Grammar
+ * defined-as = *c-wsp ("=" / "=/") *c-wsp
+ *          ; basic rules definition and
+ *          ; incremental alternatives
+ */
+template <typename ForwardIterator, typename DefinedAsContext>
+bool advance_defined_as (ForwardIterator & pos
+    , ForwardIterator last
+    , DefinedAsContext * ctx)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+
+    if (pos == last)
+        return false;
+
+    bool is_basic_rules_definition = true;
+    auto p = pos;
+
+    // *c-wsp
+    while (advance_comment_whitespace(p, last, ctx))
+        ;
+
+    if (p == last)
+        return false;
+
+    if (*p == char_type('=')) {
+        ++p;
+
+        if (p != last) {
+            if (*p == char_type('/')) {
+                ++p;
+                is_basic_rules_definition = false;
+            }
+        }
+    } else {
+        return false;
+    }
+
+    // *c-wsp
+    while (advance_comment_whitespace(p, last, ctx))
+        ;
+
+    if (ctx) {
+        if (is_basic_rules_definition)
+            ctx->accept_basic_rule_definition();
+        else
+            ctx->accept_incremental_alternatives();
+    }
+
+    return compare_and_assign(pos, p);
+}
+
 // TODO
 // * rulelist
 // * rule
-// * defined-as
 
 ////////////////////////////////////////////////////////////////////////////////
 // advance_rule
