@@ -811,7 +811,7 @@ template <typename ForwardIterator, typename GroupContext>
 bool advance_group_or_option (ForwardIterator & pos
     , ForwardIterator last
     , bool is_group
-    , GroupContext * ctx)
+    , GroupContext * ctx = nullptr)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
@@ -897,7 +897,7 @@ bool advance_option (ForwardIterator & pos
 }
 
 /**
- * @brief Advance by defined-as.
+ * @brief Advance by @c defined-as.
  *
  * @param pos On input - first position, on output - last good position.
  * @param last End of sequence position.
@@ -919,7 +919,7 @@ bool advance_option (ForwardIterator & pos
 template <typename ForwardIterator, typename DefinedAsContext>
 bool advance_defined_as (ForwardIterator & pos
     , ForwardIterator last
-    , DefinedAsContext * ctx)
+    , DefinedAsContext * ctx = nullptr)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
@@ -963,35 +963,84 @@ bool advance_defined_as (ForwardIterator & pos
     return compare_and_assign(pos, p);
 }
 
-// TODO
-// * rulelist
-// * rule
-
-////////////////////////////////////////////////////////////////////////////////
-// advance_rule
-////////////////////////////////////////////////////////////////////////////////
 /**
- * @brief Advance by @c rule sequence.
+ * @brief Advance by @c elements.
  *
  * @param pos On input - first position, on output - last good position.
  * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of ElementsContext
  * @return @c true if advanced by at least one position, otherwise @c false.
  *
- * @note Rule names are case insensitive.
+  * @par
+ * ElementsContext extends AlternationContext
+ * {}
+ *
  * @note Grammar
- * name =  elements crlf
+ * elements = alternation *c-wsp
  */
-template <typename _ForwardIterator>
-bool advance_rule (_ForwardIterator & pos
-        , _ForwardIterator last)
+template <typename ForwardIterator, typename ElementsContext>
+bool advance_elements (ForwardIterator & pos
+    , ForwardIterator last
+    , ElementsContext * ctx = nullptr)
 {
     auto p = pos;
 
-    // FIXME
-//     while (p != last && is_whitespace(*p))
-//         ++p;
+    if (!advance_alternation(p, last, ctx))
+        return false;
+
+    // *c-wsp
+    while (advance_comment_whitespace(p, last, ctx))
+        ;
 
     return compare_and_assign(pos, p);
 }
+
+/**
+ * @brief Advance by @c rule.
+ *
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @param ctx Structure satisfying requirements of RuleContext
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @par
+ * RuleContext extends RulenameContext
+ *      , ElementsContext
+ *      , DefinedAsContext
+ *      , CommentContext
+ * {}
+ *
+ * @note Grammar
+ * rule = rulename defined-as elements c-nl
+ *          ; continues if next line starts
+ *          ; with white space
+ */
+template <typename ForwardIterator, typename RuleContext>
+bool advance_rule (ForwardIterator & pos
+    , ForwardIterator last
+    , RuleContext * ctx = nullptr)
+{
+    auto p = pos;
+
+    if (!advance_rulename(p, last, ctx))
+        return false;
+
+    if (!advance_defined_as(p, last, ctx))
+        return false;
+
+    if (!advance_elements(p, last, ctx))
+        return false;
+
+    if (p != last) {
+        if (!advance_comment_newline(p, last, ctx))
+            return false;
+    }
+
+    return compare_and_assign(pos, p);
+}
+
+// TODO
+// * rulelist
+
 
 }}} // // namespace pfs::parser::abnf

@@ -653,10 +653,12 @@ TEST_CASE("advance_rulename") {
 }
 
 struct dummy_element_context
-    : dummy_rulename_context
-    , dummy_number_context
-    , dummy_quoted_string_context
-    , dummy_prose_context
+    : virtual public dummy_rulename_context
+    , virtual public dummy_number_context
+    , virtual public dummy_quoted_string_context
+    , virtual public dummy_prose_context
+    , virtual public dummy_comment_context
+    , virtual public dummy_repeat_context
 {
     // Below are requirements for GroupContext and OptionContext
 
@@ -667,14 +669,6 @@ struct dummy_element_context
     // RepetitionContext
     void begin_repetition () {}
     void end_repetition (bool) {}
-
-    // RepeatContext
-    void repeat (forward_iterator first_from, forward_iterator last_from
-        , forward_iterator first_to, forward_iterator last_to)
-    {}
-
-    // CommentContext
-    void comment (forward_iterator first, forward_iterator last) {}
 };
 
 TEST_CASE("advance_element") {
@@ -962,7 +956,7 @@ TEST_CASE("advance_group") {
 }
 
 struct dummy_defined_as_context
-    : dummy_comment_context
+    : public virtual dummy_comment_context
 {
     void accept_basic_rule_definition () {}
     void accept_incremental_alternatives () {}
@@ -987,6 +981,64 @@ TEST_CASE("advance_defined_as") {
         auto pos = first;
 
         auto result = advance_defined_as(pos, last, ctx);
+
+        CHECK(result == item.success);
+        CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
+    }
+}
+
+struct dummy_elements_context
+    : dummy_alternation_context
+{};
+
+TEST_CASE("advance_elements") {
+    using pfs::parser::abnf::advance_elements;
+
+    std::vector<test_item> test_values = {
+          { true, 2, {'a', ' '} }
+        , { true, 4, {'a', ';', '\n', '\t'} }
+    };
+
+    dummy_elements_context * ctx = nullptr;
+
+    for (auto const & item : test_values) {
+        auto first = item.data.begin();
+        auto last = item.data.end();
+        auto pos = first;
+
+        auto result = advance_elements(pos, last, ctx);
+
+        CHECK(result == item.success);
+        CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
+    }
+}
+
+struct dummy_rule_context
+    : dummy_alternation_context
+    , dummy_defined_as_context
+    , public virtual dummy_comment_context
+{};
+
+TEST_CASE("advance_rule") {
+    using pfs::parser::abnf::advance_rule;
+
+    std::vector<test_item> test_values = {
+          { true, 9, {'r', ' ', '=', ' ', '[', 'p', ']', ' ', 'e'} }
+
+        , { true, 34, {'r', 'e', 'p', 'e', 't', 'i', 't', 'i', 'o', 'n'
+                , ' ', ' ', ' ', ' ', ' ', '=', ' ', ' ', '[', 'r', 'e'
+                , 'p', 'e', 'a', 't', ']', ' ', 'e', 'l', 'e', 'm', 'e'
+                , 'n', 't'} }
+    };
+
+    dummy_rule_context * ctx = nullptr;
+
+    for (auto const & item : test_values) {
+        auto first = item.data.begin();
+        auto last = item.data.end();
+        auto pos = first;
+
+        auto result = advance_rule(pos, last, ctx);
 
         CHECK(result == item.success);
         CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
