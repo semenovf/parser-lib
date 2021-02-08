@@ -23,7 +23,10 @@ struct test_item
 };
 
 static std::vector<test_item> data_files {
-    { "data/abnf.grammar", 37 }
+      { "data/wsp.grammar", 1 }
+    , { "data/abnf.grammar", 37 }
+    , { "data/json-rfc4627.grammar", 30 }
+    , { "data/json-rfc8259.grammar", 30 }
 };
 
 using forward_iterator = pfs::parser::line_counter_iterator<std::string::const_iterator>;
@@ -72,7 +75,10 @@ struct dummy_context
 
     // QuotedStringContext
     void quoted_string (forward_iterator, forward_iterator) {}
-    void error (std::error_code) {}
+    void error (std::error_code ec)
+    {
+        std::cerr << "Parse error: " << ec.message() << std::endl;
+    }
     size_t max_quoted_string_length () { return 0; }
 
     // RepeatContext
@@ -118,12 +124,13 @@ TEST_CASE("Parse files") {
         auto last  = forward_iterator(source.end());
         auto result = advance_rulelist(first, last, & ctx);
 
-        if (!result) {
+        if (!result || first != last) {
             std::cerr << "ERROR: advance_rulelist failed at " << first.lineno()
                 << " line" << std::endl;
         }
 
         CHECK_MESSAGE(result, item.filename);
+        CHECK((first == last));
         CHECK(ctx.rulenames == item.rulenames);
 
         return true;

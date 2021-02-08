@@ -510,7 +510,6 @@ inline bool advance_comment_newline (ForwardIterator & pos
 {
     return advance_newline(pos, last)
         || advance_comment(pos, last, ctx);
-    using char_type = typename std::remove_reference<decltype(*pos)>::type;
 }
 
 /**
@@ -669,8 +668,6 @@ bool advance_repetition (ForwardIterator & pos
 {
     if (pos == last)
         return false;
-
-    auto p = pos;
 
     if (ctx)
         ctx->begin_repetition();
@@ -1063,7 +1060,7 @@ bool advance_rulelist (ForwardIterator & pos
                 ;
             } else {
                 // *c-wsp
-                while (advance_comment_whitespace(pos, last, ctx))
+                while (advance_comment_whitespace(p, last, ctx))
                     ;
 
                 if (p != last) {
