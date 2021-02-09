@@ -44,7 +44,9 @@ TEST_CASE("is_prose_value_char") {
 
 struct dummy_prose_context
 {
+    // LCOV_EXCL_START
     void prose (forward_iterator, forward_iterator) {}
+    // LCOV_EXCL_STOP
 };
 
 TEST_CASE("advance_prose") {
@@ -89,9 +91,11 @@ TEST_CASE("advance_prose") {
 
 struct dummy_number_context
 {
+    // LCOV_EXCL_START
     void first_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
     void last_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
     void next_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
+    // LCOV_EXCL_STOP
 };
 
 TEST_CASE("advance_number") {
@@ -195,9 +199,11 @@ struct quoted_string_context
 
 struct dummy_quoted_string_context
 {
+    // LCOV_EXCL_START
     void quoted_string (forward_iterator, forward_iterator) {}
     void error (error_code) {}
     size_t max_quoted_string_length () { return 0; }
+    // LCOV_EXCL_STOP
 };
 
 TEST_CASE("advance_quoted_string") {
@@ -272,9 +278,10 @@ TEST_CASE("advance_quoted_string") {
 
 struct dummy_repeat_context
 {
+    // LCOV_EXCL_START
     void repeat (forward_iterator first_from, forward_iterator last_from
-        , forward_iterator first_to, forward_iterator last_to)
-    {}
+        , forward_iterator first_to, forward_iterator last_to) {}
+    // LCOV_EXCL_STOP
 };
 
 struct repeat_context
@@ -388,7 +395,9 @@ TEST_CASE("advance_repeat") {
 
 struct dummy_comment_context
 {
+    // LCOV_EXCL_START
     void comment (forward_iterator first, forward_iterator last) {}
+    // LCOV_EXCL_STOP
 };
 
 struct comment_context
@@ -545,7 +554,9 @@ TEST_CASE("advance_comment_whitespace") {
 
 struct dummy_rulename_context
 {
+    // LCOV_EXCL_START
     void rulename (forward_iterator first, forward_iterator last) {}
+    // LCOV_EXCL_STOP
 };
 
 struct rulename_context
@@ -662,6 +673,7 @@ struct dummy_element_context
 {
     // Below are requirements for GroupContext and OptionContext
 
+    // LCOV_EXCL_START
     // ConcatenationContext
     void begin_concatenation () {}
     void end_concatenation (bool ) {}
@@ -669,6 +681,7 @@ struct dummy_element_context
     // RepetitionContext
     void begin_repetition () {}
     void end_repetition (bool) {}
+    // LCOV_EXCL_STOP
 };
 
 TEST_CASE("advance_element") {
@@ -784,8 +797,10 @@ TEST_CASE("advance_element") {
 struct dummy_repetition_context
     : dummy_element_context
 {
+    // LCOV_EXCL_START
     void begin_repetition () {}
     void end_repetition (bool) {}
+    // LCOV_EXCL_STOP
 };
 
 TEST_CASE("advance_repetition") {
@@ -844,8 +859,10 @@ TEST_CASE("advance_repetition") {
 struct dummy_concatenation_context
     : dummy_repetition_context
 {
+    // LCOV_EXCL_START
     void begin_concatenation () {}
     void end_concatenation (bool ) {}
+    // LCOV_EXCL_STOP
 };
 
 TEST_CASE("advance_concatenation") {
@@ -958,8 +975,10 @@ TEST_CASE("advance_group") {
 struct dummy_defined_as_context
     : public virtual dummy_comment_context
 {
+    // LCOV_EXCL_START
     void accept_basic_rule_definition () {}
     void accept_incremental_alternatives () {}
+    // LCOV_EXCL_STOP
 };
 
 TEST_CASE("advance_defined_as") {
@@ -1057,23 +1076,20 @@ TEST_CASE("advance_rulelist") {
     using pfs::parser::abnf::advance_rulelist;
 
     std::vector<test_item> test_values = {
-//           { true, 4, {' ', ';', '\n', '\n'} }
-        { true, 18, {'w', '=', '"', ' ', '"', ' '
+          { true, 4, {' ', ';', '\n', '\n'} }
+        , { true, 18, {'w', '=', '"', ' ', '"', ' '
               , '/', ' ', '"', '\\', 't', '"', ';', ' ', 'c', '\n', '\n', '\n'} }
-//         { true, 4, {'w', '=', '"', ' ', '"', ' '
-//               , '/', ' ', '"', ' ', '"', ';', ' ', 'c', '\n', '\n', '\n'} }
+        , { true, 12, {'w', '=', 'a', ' ', '/', 'b', ';', ' ', 'c', '\n', '\n', '\n'} }
 
-//         { true, 12, {'w', '=', 'a', ' ', '/', 'b', ';', ' ', 'c', '\n', '\n', '\n'} }
+        , { true, 32, {'W', 'S', 'P', ' ', '=', ' ', '"', ' ', '"', ' '
+              , '/', ' ', '"', '\\', 't', '"', ';', ' ', 'w', 'h', 'i', 't', 'e'
+              , ' ', 's', 'p', 'a', 'c', 'e', '\n', '\n', '\n'} }
+        , { true, 9, {'r', ' ', '=', ' ', '[', 'p', ']', ' ', 'e'} }
 
-//         , { true, 4, {'W', 'S', 'P', ' ', '=', ' ', '"', ' ', '"', ' '
-//               , '/', ' ', '"', '\t', '"', ';', ' ', 'w', 'h', 'i', 't', 'e'
-//               , ' ', 's', 'p', 'a', 'c', 'e', '\n', '\n', '\n'} }
-//         , { true, 9, {'r', ' ', '=', ' ', '[', 'p', ']', ' ', 'e'} }
-//
-//         , { true, 34, {'r', 'e', 'p', 'e', 't', 'i', 't', 'i', 'o', 'n'
-//                 , ' ', ' ', ' ', ' ', ' ', '=', ' ', ' ', '[', 'r', 'e'
-//                 , 'p', 'e', 'a', 't', ']', ' ', 'e', 'l', 'e', 'm', 'e'
-//                 , 'n', 't'} }
+        , { true, 34, {'r', 'e', 'p', 'e', 't', 'i', 't', 'i', 'o', 'n'
+                , ' ', ' ', ' ', ' ', ' ', '=', ' ', ' ', '[', 'r', 'e'
+                , 'p', 'e', 'a', 't', ']', ' ', 'e', 'l', 'e', 'm', 'e'
+                , 'n', 't'} }
     };
 
     dummy_rulelist_context * ctx = nullptr;

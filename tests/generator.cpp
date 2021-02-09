@@ -27,8 +27,9 @@ TEST_CASE("advance_repetition_by_range") {
     };
 
     std::vector<test_item> test_values = {
-          { true, 1, {'a'}, {0, 1} }
-        , { true, 2, {'a', 'b'}, {1, 2} }
+          { true , 1, {'a'}, {0, 1} }
+        , { true , 2, {'a', 'b'}, {1, 2} }
+        , { false, 0, {'9'}, {1, 0} }
     };
 
     for (auto const & item : test_values) {

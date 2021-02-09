@@ -29,6 +29,11 @@ public:
         , _it(rhs._it)
     {}
 
+    ForwardIterator base ()
+    {
+        return _it;
+    }
+
     auto operator * () const -> decltype(*_it)
     {
         return *_it;

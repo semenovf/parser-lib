@@ -130,9 +130,9 @@ bool advance_prose (ForwardIterator & pos
     if (*p != char_type('<'))
         return false;
 
-    auto first_pos = p;
-
     ++p;
+
+    auto first_pos = p;
 
     while (p != last && is_prose_value_char(*p))
         ++p;

@@ -24,9 +24,12 @@ struct test_item
 
 static std::vector<test_item> data_files {
       { "data/wsp.grammar", 1 }
+    , { "data/prose.grammar", 1 }
     , { "data/abnf.grammar", 37 }
     , { "data/json-rfc4627.grammar", 30 }
     , { "data/json-rfc8259.grammar", 30 }
+    , { "data/uri-rfc3986.grammar", 36 }
+    , { "data/uri-geo-rfc58070.grammar", 27 }
 };
 
 using forward_iterator = pfs::parser::line_counter_iterator<std::string::const_iterator>;
@@ -36,8 +39,10 @@ std::string read_file (std::string const & filename)
     std::ifstream ifs(filename.c_str(), std::ios::binary | std::ios::ate);
 
     if (!ifs.is_open()) {
+        // LCOV_EXCL_START
         std::cerr << "Open file " << filename << " failure\n";
         return std::string{};
+        // LCOV_EXCL_STOP
     }
 
     std::noskipws(ifs);
@@ -54,7 +59,9 @@ std::string read_file (std::string const & filename)
     if (ifs) {
         ; // success
     } else {
+        // LCOV_EXCL_START
         str.clear(); // error
+        // LCOV_EXCL_STOP
     }
 
     ifs.close();
@@ -71,14 +78,18 @@ struct dummy_context
     // NumberContext
     void first_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
     void last_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
-    void next_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
+    void next_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {} // LCOV_EXCL_LINE
 
     // QuotedStringContext
     void quoted_string (forward_iterator, forward_iterator) {}
+
+    // LCOV_EXCL_START
     void error (std::error_code ec)
     {
         std::cerr << "Parse error: " << ec.message() << std::endl;
     }
+    // LCOV_EXCL_STOP
+
     size_t max_quoted_string_length () { return 0; }
 
     // RepeatContext
@@ -101,7 +112,7 @@ struct dummy_context
 
     // DefinedAsContext
     void accept_basic_rule_definition () { rulenames++; }
-    void accept_incremental_alternatives () {}
+    void accept_incremental_alternatives () {} // LCOV_EXCL_LINE
 };
 
 TEST_CASE("Parse files") {
@@ -115,8 +126,10 @@ TEST_CASE("Parse files") {
         auto source = read_file(item.filename);
 
         if (source.empty()) {
+            // LCOV_EXCL_START
             std::cerr << "ERROR: reading file failure or it is empty" << std::endl;
             return false;
+            // LCOV_EXCL_STOP
         }
 
         dummy_context ctx;
@@ -125,8 +138,10 @@ TEST_CASE("Parse files") {
         auto result = advance_rulelist(first, last, & ctx);
 
         if (!result || first != last) {
+            // LCOV_EXCL_START
             std::cerr << "ERROR: advance_rulelist failed at " << first.lineno()
                 << " line" << std::endl;
+            // LCOV_EXCL_STOP
         }
 
         CHECK_MESSAGE(result, item.filename);

@@ -14,14 +14,20 @@ option(${PROJECT_NAME}_BUILD_EXAMPLES "Build examples" OFF)
 
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
 message(STATUS "C++ compiler version: ${CMAKE_CXX_COMPILER_VERSION}")
-message(STATUS "Project alias: ${project_alias}")
+message(STATUS "Project alias: ${_project_alias}")
 
 set(CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) # use -std=c++XX rather than -std=gnu++XX
 
+include(${CMAKE_SOURCE_DIR}/cmake/cxx20_concepts.cmake)
+
 add_library(${PROJECT_NAME} INTERFACE)
 add_library(${_project_alias} ALIAS ${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include)
+
+if (PFS_CXX_HAVE_CONCEPTS)
+    target_compile_definitions(${PROJECT_NAME} INTERFACE PFS_CXX_HAVE_CONCEPTS)
+endif()
 
 if (${PROJECT_NAME}_BUILD_TESTS)
     enable_testing()
