@@ -44,7 +44,7 @@ public:
         using char_type = typename std::remove_reference<decltype(*_it)>::type;
 
         if (*_it == '\x0D')
-            _is_CR == true;
+            _is_CR = true;
         else
             _is_CR = false;
 

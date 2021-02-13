@@ -4,8 +4,12 @@
 // This file is part of [pfs-parser](https://github.com/semenovf/pfs-parser) library.
 //
 // Changelog:
-//      2021.01.16 Initial version
-//      2021.02.07 Alpha release
+//      2021.01.16 Initial version.
+//      2021.02.07 Alpha release.
+//
+// TODO 1. Add Concepts.
+//      2. Implement Abstract Syntax Tree.
+//
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
@@ -14,6 +18,10 @@
 #include "pfs/parser/generator.hpp"
 #include <bitset>
 #include <type_traits>
+
+#if __cplusplus > 201703L && __cpp_concepts >= 201907L
+#   include <concepts>
+#endif
 
 namespace pfs {
 namespace parser {

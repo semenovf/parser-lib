@@ -12,6 +12,12 @@ include(CMakePushCheckState)
 include(CheckIncludeFileCXX)
 include(CheckCXXSourceCompiles)
 
+# This is OBSOLETE.
+# Use in-source check:
+# #if __cplusplus > 201703L && __cpp_concepts >= 201907L
+#       ...
+# #endif
+
 # Examples from:
 # https://devblogs.microsoft.com/cppblog/c20-concepts-are-here-in-visual-studio-2019-version-16-3/
 
@@ -20,9 +26,11 @@ cmake_push_check_state()
 set(__have_concepts FALSE)
 check_include_file_cxx("concepts" _have_std_concepts_header)
 
+# TODO need to compile with specific options (`-std=c++2a`, `-std=c++20` or `-fconcepts` for g++)
+# These options must be set before for project
 if (_have_std_concepts_header)
     string(CONFIGURE [[
-        //#include <concepts>
+        #include <concepts>
 
         // This concept tests whether 'T::type' is a valid type
         template<typename T>

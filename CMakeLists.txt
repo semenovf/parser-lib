@@ -19,7 +19,12 @@ message(STATUS "Project alias: ${_project_alias}")
 set(CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) # use -std=c++XX rather than -std=gnu++XX
 
-include(${CMAKE_SOURCE_DIR}/cmake/cxx20_concepts.cmake)
+# This is OBSOLETE.
+# Use in-source check:
+# #if __cplusplus > 201703L && __cpp_concepts >= 201907L
+#       ...
+# #endif
+# include(${CMAKE_SOURCE_DIR}/cmake/cxx20_concepts.cmake)
 
 add_library(${PROJECT_NAME} INTERFACE)
 add_library(${_project_alias} ALIAS ${PROJECT_NAME})
