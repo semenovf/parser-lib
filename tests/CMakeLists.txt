@@ -14,7 +14,8 @@ set(TEST_NAMES
     generator
     core_rules
     abnf_rules
-    parse_files)
+    parse_files
+    syntax_tree)
 
 foreach (name ${TEST_NAMES})
     if (${name}_SOURCES)

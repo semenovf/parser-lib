@@ -4,7 +4,7 @@
 // This file is part of [pfs-parser](https://github.com/semenovf/pfs-parser) library.
 //
 // Changelog:
-//      2021.02.07 Initial version
+//      2021.02.14 Initial version
 ////////////////////////////////////////////////////////////////////////////////
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
@@ -12,9 +12,9 @@
 #include "pfs/parser/line_counter_iterator.hpp"
 #include "utils/read_file.hpp"
 #include <iterator>
-#include <fstream>
-#include <string>
-#include <sstream>
+// #include <fstream>
+// #include <string>
+// #include <sstream>
 #include <vector>
 
 struct test_item
@@ -35,10 +35,11 @@ static std::vector<test_item> data_files {
 
 using forward_iterator = pfs::parser::line_counter_iterator<std::string::const_iterator>;
 
-struct dummy_context
+class syntax_tree_context
 {
     int rulenames = 0;
 
+public:
     // ProseContext
     void prose (forward_iterator, forward_iterator) {}
 
@@ -82,7 +83,7 @@ struct dummy_context
     void accept_incremental_alternatives () {} // LCOV_EXCL_LINE
 };
 
-TEST_CASE("Parse files") {
+TEST_CASE("Syntax Tree") {
     using pfs::parser::abnf::advance_rulelist;
 
     bool result = std::all_of(data_files.cbegin()
@@ -99,7 +100,7 @@ TEST_CASE("Parse files") {
             // LCOV_EXCL_STOP
         }
 
-        dummy_context ctx;
+        syntax_tree_context ctx;
         auto first = forward_iterator(source.begin());
         auto last  = forward_iterator(source.end());
         auto result = advance_rulelist(first, last, & ctx);
@@ -113,11 +114,12 @@ TEST_CASE("Parse files") {
 
         CHECK_MESSAGE(result, item.filename);
         CHECK((first == last));
-        CHECK(ctx.rulenames == item.rulenames);
+//         CHECK(ctx.rulenames == item.rulenames);
 
         return true;
     });
 
     CHECK_MESSAGE(result, "Parse files tested successfuly");
 }
+
 

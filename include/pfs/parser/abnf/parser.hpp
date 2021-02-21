@@ -545,7 +545,13 @@ inline bool advance_comment_whitespace (ForwardIterator & pos
 
     if (is_whitespace_char(*p)) {
         ++p;
-    } else if (advance_comment_newline(p, last, ctx) && is_whitespace_char(*p)) {
+    } else if (advance_comment_newline(p, last, ctx)) {
+        if (p == last)
+            return false;
+
+        if (! is_whitespace_char(*p))
+            return false;
+
         ++p;
     } else {
         return false;
@@ -784,10 +790,16 @@ bool advance_alternation (ForwardIterator & pos
             while (advance_comment_whitespace(p, last, ctx))
                 ;
 
+            if (p == last)
+                return false;
+
             if (*p != char_type('/'))
                 return false;
 
             ++p;
+
+            if (p == last)
+                return false;
 
             // *c-wsp
             while (advance_comment_whitespace(p, last, ctx))
