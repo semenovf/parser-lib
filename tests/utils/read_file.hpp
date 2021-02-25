@@ -15,13 +15,12 @@ namespace utils {
 
 inline std::string read_file (std::string const & filename)
 {
+    // LCOV_EXCL_START
     std::ifstream ifs(filename.c_str(), std::ios::binary | std::ios::ate);
 
     if (!ifs.is_open()) {
-        // LCOV_EXCL_START
         std::cerr << "Open file " << filename << " failure\n";
         return std::string{};
-        // LCOV_EXCL_STOP
     }
 
     std::noskipws(ifs);
@@ -38,13 +37,12 @@ inline std::string read_file (std::string const & filename)
     if (ifs) {
         ; // success
     } else {
-        // LCOV_EXCL_START
         str.clear(); // error
-        // LCOV_EXCL_STOP
     }
 
     ifs.close();
     return str;
+    // LCOV_EXCL_STOP
 }
 
 } // namespace utils

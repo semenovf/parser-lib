@@ -12,9 +12,6 @@
 #include "pfs/parser/line_counter_iterator.hpp"
 #include "utils/read_file.hpp"
 #include <iterator>
-// #include <fstream>
-// #include <string>
-// #include <sstream>
 #include <vector>
 
 struct test_item
@@ -121,5 +118,3 @@ TEST_CASE("Syntax Tree") {
 
     CHECK_MESSAGE(result, "Parse files tested successfuly");
 }
-
-

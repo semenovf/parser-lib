@@ -10,7 +10,7 @@ string(REPLACE "-" "::" _project_alias ${PROJECT_NAME})
 set(_project_basename ${PROJECT_NAME})
 
 option(${PROJECT_NAME}_BUILD_TESTS "Build tests" OFF)
-option(${PROJECT_NAME}_BUILD_EXAMPLES "Build examples" OFF)
+option(${PROJECT_NAME}_BUILD_DEMO "Build demo" OFF)
 
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
 message(STATUS "C++ compiler version: ${CMAKE_CXX_COMPILER_VERSION}")
@@ -39,6 +39,6 @@ if (${PROJECT_NAME}_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
-if (${PROJECT_NAME}_BUILD_EXAMPLES)
-    add_subdirectory(examples)
+if (${PROJECT_NAME}_BUILD_DEMO)
+    add_subdirectory(demo)
 endif()
