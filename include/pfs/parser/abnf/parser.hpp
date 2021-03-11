@@ -38,54 +38,15 @@ namespace abnf {
  */
 
 enum parse_policy_flag {
-    // Allow case sensitive sequence for rule name (default is case insensitive) as quotation mark besides double quote
+    // Allow case sensitive sequence for rule name (default is case insensitive)
+    // as quotation mark besides double quote
+    // TODO Is not applicable yet
       allow_case_sensitive_rulenames
-
-
-//     , allow_array_root_element
-//     , allow_number_root_element
-//     , allow_string_root_element
-//     , allow_boolean_root_element
-//     , allow_null_root_element
-//
-//     // Allow apostrophe as quotation mark besides double quote
-//     , allow_single_quote_mark
-//
-//     // Allow any escaped character in string not only permitted by grammar
-//     , allow_any_char_escaped
-//
-//     // Clarification:
-//     // Compare original 'number' grammar with modified:
-//     // Original:
-//     //      number = [ minus ] int ...
-//     // Modified:
-//     //      number = [ minus / plus] int ...
-//     , allow_positive_signed_number
 
     , parse_policy_count
 };
 
 using parse_policy_set = std::bitset<parse_policy_count>;
-
-// template <typename InputIt1, typename InputIt2>
-// inline bool starts_with (InputIt1 first1, InputIt1 last1
-//     , InputIt2 first2, InputIt1 last2)
-// {
-//     for (; first1 != last1 && first2 != last2; ++first1, ++first2) {
-//         if (!(*first1 == *first2)) {
-//             return false;
-//         }
-//     }
-//
-//     return first2 == last2;
-// }
-//
-// template <typename CharType>
-// inline bool starts_with (std::initializer_list<CharType> const & l1
-//     , std::initializer_list<CharType> const & l2)
-// {
-//     return starts_with(l1.begin(), l1.end(), l2.begin(), l2.end());
-// }
 
 /**
  * @return @c true if @a ch is any 7-bit US-ASCII character, excluding NUL,

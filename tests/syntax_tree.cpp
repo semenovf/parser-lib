@@ -9,6 +9,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "pfs/parser/abnf/parser.hpp"
+#include "pfs/parser/abnf/syntax_tree.hpp"
 #include "pfs/parser/line_counter_iterator.hpp"
 #include "utils/read_file.hpp"
 #include <iterator>
@@ -30,15 +31,23 @@ static std::vector<test_item> data_files {
     , { "data/uri-geo-rfc58070.grammar", 27 }
 };
 
-using forward_iterator = pfs::parser::line_counter_iterator<std::string::const_iterator>;
+using string_type = std::string;
+using forward_iterator = pfs::parser::line_counter_iterator<string_type::const_iterator>;
 
 class syntax_tree_context
 {
     int rulenames = 0;
+    using basic_node = pfs::parser::abnf::basic_node;
+
+    std::map<string_type, std::unique_ptr<basic_node>> _tree;
 
 public:
     // ProseContext
-    void prose (forward_iterator, forward_iterator) {}
+    void prose (forward_iterator first, forward_iterator last)
+    {
+        _tree.emplace(std::make_pair(string_type{"prose"}
+            , pfs::parser::abnf::make_unique_prose(string_type(first.base(), last.base()))));
+    }
 
     // NumberContext
     void first_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
