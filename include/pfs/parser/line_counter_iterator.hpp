@@ -34,6 +34,11 @@ public:
         return _it;
     }
 
+    operator ForwardIterator ()
+    {
+        return _it;
+    }
+
     auto operator * () const -> decltype(*_it)
     {
         return *_it;

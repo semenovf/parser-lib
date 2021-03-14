@@ -59,9 +59,16 @@ struct dummy_context
 
     size_t max_quoted_string_length () { return 0; }
 
+    // GroupContext
+    void begin_group () {}
+    void end_group (bool success) {}
+
+    // OptionContext
+    void begin_option () {}
+    void end_option (bool success) {}
+
     // RepeatContext
-    void repeat (forward_iterator first_from, forward_iterator last_from
-        , forward_iterator first_to, forward_iterator last_to) {}
+    void repeat (long from, long to) {}
 
     // CommentContext
     void comment (forward_iterator first, forward_iterator last) {}
@@ -73,9 +80,17 @@ struct dummy_context
     void begin_repetition () {}
     void end_repetition (bool success) {}
 
+    // AlternationContext
+    void begin_alternation () {}
+    void end_alternation (bool success) {}
+
     // ConcatenationContext
     void begin_concatenation () {}
     void end_concatenation (bool success) {}
+
+    // RuleContext
+    void begin_rule () {}
+    void end_rule (bool success) {}
 
     // DefinedAsContext
     void accept_basic_rule_definition () { rulenames++; }

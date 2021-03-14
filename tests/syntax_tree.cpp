@@ -7,13 +7,14 @@
 //      2021.02.14 Initial version
 ////////////////////////////////////////////////////////////////////////////////
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#define PFS_SYNTAX_TREE_TRACE_ENABLE 1
 #include "doctest.h"
 #include "pfs/parser/abnf/parser.hpp"
 #include "pfs/parser/abnf/syntax_tree.hpp"
-#include "pfs/parser/line_counter_iterator.hpp"
 #include "utils/read_file.hpp"
 #include <iterator>
 #include <vector>
+#include <cassert>
 
 struct test_item
 {
@@ -24,6 +25,7 @@ struct test_item
 static std::vector<test_item> data_files {
       { "data/wsp.grammar", 1 }
     , { "data/prose.grammar", 1 }
+    , { "data/comment.grammar", 1 }
     , { "data/abnf.grammar", 37 }
     , { "data/json-rfc4627.grammar", 30 }
     , { "data/json-rfc8259.grammar", 30 }
@@ -33,61 +35,6 @@ static std::vector<test_item> data_files {
 
 using string_type = std::string;
 using forward_iterator = pfs::parser::line_counter_iterator<string_type::const_iterator>;
-
-class syntax_tree_context
-{
-    int rulenames = 0;
-    using basic_node = pfs::parser::abnf::basic_node;
-
-    std::map<string_type, std::unique_ptr<basic_node>> _tree;
-
-public:
-    // ProseContext
-    void prose (forward_iterator first, forward_iterator last)
-    {
-        _tree.emplace(std::make_pair(string_type{"prose"}
-            , pfs::parser::abnf::make_unique_prose(string_type(first.base(), last.base()))));
-    }
-
-    // NumberContext
-    void first_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
-    void last_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
-    void next_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {} // LCOV_EXCL_LINE
-
-    // QuotedStringContext
-    void quoted_string (forward_iterator, forward_iterator) {}
-
-    // LCOV_EXCL_START
-    void error (std::error_code ec)
-    {
-        std::cerr << "Parse error: " << ec.message() << std::endl;
-    }
-    // LCOV_EXCL_STOP
-
-    size_t max_quoted_string_length () { return 0; }
-
-    // RepeatContext
-    void repeat (forward_iterator first_from, forward_iterator last_from
-        , forward_iterator first_to, forward_iterator last_to) {}
-
-    // CommentContext
-    void comment (forward_iterator first, forward_iterator last) {}
-
-    // RulenameContext
-    void rulename (forward_iterator first, forward_iterator last) {}
-
-    // RepetitionContext
-    void begin_repetition () {}
-    void end_repetition (bool success) {}
-
-    // ConcatenationContext
-    void begin_concatenation () {}
-    void end_concatenation (bool success) {}
-
-    // DefinedAsContext
-    void accept_basic_rule_definition () { rulenames++; }
-    void accept_incremental_alternatives () {} // LCOV_EXCL_LINE
-};
 
 TEST_CASE("Syntax Tree") {
     using pfs::parser::abnf::advance_rulelist;
@@ -106,7 +53,7 @@ TEST_CASE("Syntax Tree") {
             // LCOV_EXCL_STOP
         }
 
-        syntax_tree_context ctx;
+        pfs::parser::abnf::syntax_tree_context<string_type::const_iterator, string_type> ctx;
         auto first = forward_iterator(source.begin());
         auto last  = forward_iterator(source.end());
         auto result = advance_rulelist(first, last, & ctx);
@@ -120,7 +67,9 @@ TEST_CASE("Syntax Tree") {
 
         CHECK_MESSAGE(result, item.filename);
         CHECK((first == last));
-//         CHECK(ctx.rulenames == item.rulenames);
+
+        // TODO Uncomment after implementation complete
+        // CHECK(ctx.rules_count() == item.rulenames);
 
         return true;
     });

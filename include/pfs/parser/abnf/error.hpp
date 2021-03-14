@@ -25,7 +25,8 @@ enum class errc
 //     , forbidden_root_element
     , unbalanced_quote
     , bad_quoted_char
-    , max_lengh_exceeded
+    , max_length_exceeded
+    , bad_repeat_range
 //     , bad_escaped_char
 //     , bad_encoded_char
 //     , unbalanced_array_bracket
@@ -55,27 +56,10 @@ public:
                 return std::string{"unquoted string"};
             case static_cast<int>(errc::bad_quoted_char):
                 return std::string{"bad quoted char"};
-            case static_cast<int>(errc::max_lengh_exceeded):
-                return std::string{"max length exceeded"};
-
-//             case static_cast<int>(errc::bad_escaped_char):
-//                 return std::string{"bad escaped char"};
-//             case static_cast<int>(errc::bad_encoded_char):
-//                 return std::string{"bad encoded char"};
-//             case static_cast<int>(errc::unbalanced_array_bracket):
-//                 return std::string{"unbalanced array bracket"};
-//             case static_cast<int>(errc::unbalanced_object_bracket):
-//                 return std::string{"unbalanced object bracket"};
-//             case static_cast<int>(errc::bad_member_name):
-//                 return std::string{"bad member name"};
-//             case static_cast<int>(errc::bad_json_sequence):
-//                 return std::string{"bad json sequence"};
-//
-//             case static_cast<int>(errc::type_error):
-//                 return std::string{"type error"};
-//
-//             case static_cast<int>(errc::null_pointer):
-//                 return std::string{"null pointer"};
+            case static_cast<int>(errc::max_length_exceeded):
+                return std::string{"maximum string length exceeded"};
+            case static_cast<int>(errc::bad_repeat_range):
+                return std::string{"bad repeat range"};
 
             default: return std::string{"unknown parser error"};
         }

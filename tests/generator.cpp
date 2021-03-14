@@ -50,3 +50,33 @@ TEST_CASE("advance_repetition_by_range") {
         CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
     }
 }
+
+TEST_CASE("to_decimal_number") {
+    using pfs::parser::to_decimal_number;
+
+    struct test_item {
+        std::pair<long, bool> result;
+        std::vector<char> data;
+    };
+
+    std::vector<test_item> test_values = {
+          { {1, true}, {'1'} }
+        , { {0, false}, {'a'} }
+        , { {0, false}, {'0', 'b'} }
+        , { {std::numeric_limits<long>::max(), false}, {'9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9'} }
+        , { {12, true}, {'1', '2'} }
+        , { {9, true}, {'0', '0', '9'} }
+        , { {909, true}, {'9', '0', '9'} }
+    };
+
+    for (auto const & item : test_values) {
+        auto first = item.data.begin();
+        auto last = item.data.end();
+        auto pos = first;
+
+        auto result = to_decimal_number(first, last);
+
+        CHECK(result.first == item.result.first);
+        CHECK(result.second == item.result.second);
+    }
+}

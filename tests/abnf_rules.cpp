@@ -272,15 +272,15 @@ TEST_CASE("advance_quoted_string") {
         auto pos = s.begin();
         CHECK_FALSE(advance_quoted_string(pos, s.end(), & ctx));
         CHECK(pos == s.begin());
-        CHECK(ctx.result_ec == pfs::parser::make_error_code(pfs::parser::errc::max_lengh_exceeded));
+        CHECK(ctx.result_ec == pfs::parser::make_error_code(pfs::parser::errc::max_length_exceeded));
     }
 }
 
 struct dummy_repeat_context
 {
     // LCOV_EXCL_START
-    void repeat (forward_iterator first_from, forward_iterator last_from
-        , forward_iterator first_to, forward_iterator last_to) {}
+    void repeat (long from, long to) {}
+    void error (error_code ec) {}
     // LCOV_EXCL_STOP
 };
 
@@ -288,15 +288,16 @@ struct repeat_context
 {
     using forward_iterator = std::string::const_iterator;
 
-    std::string from;
-    std::string to;
+    long from;
+    long to;
 
-    void repeat (forward_iterator first_from, forward_iterator last_from
-        , forward_iterator first_to, forward_iterator last_to)
+    void repeat (long f, long t)
     {
-        from = std::string{first_from, last_from};
-        to = std::string{first_to, last_to};
+        from = f;
+        to = t;
     }
+
+    void error (error_code ec) {}
 };
 
 TEST_CASE("advance_repeat") {
@@ -338,8 +339,8 @@ TEST_CASE("advance_repeat") {
         auto pos = s.begin();
         CHECK(advance_repeat(pos, s.end(), & ctx));
         CHECK(pos == s.end());
-        CHECK(ctx.from == std::string{"10"});
-        CHECK(ctx.to == ctx.from);
+        CHECK(ctx.from == 10L);
+        CHECK(ctx.to == 10L);
     }
 
     {
@@ -348,8 +349,8 @@ TEST_CASE("advance_repeat") {
         auto pos = s.begin();
         CHECK(advance_repeat(pos, s.end(), & ctx));
         CHECK(pos == s.end());
-        CHECK(ctx.from == std::string{"10"});
-        CHECK(ctx.to.empty());
+        CHECK(ctx.from == 10L);
+        CHECK(ctx.to == std::numeric_limits<long>::max());
     }
 
     {
@@ -358,8 +359,8 @@ TEST_CASE("advance_repeat") {
         auto pos = s.begin();
         CHECK(advance_repeat(pos, s.end(), & ctx));
         CHECK(pos == s.end());
-        CHECK(ctx.from.empty());
-        CHECK(ctx.to == std::string{"10"});
+        CHECK(ctx.from == 0);
+        CHECK(ctx.to == 10L);
     }
 
     {
@@ -368,8 +369,8 @@ TEST_CASE("advance_repeat") {
         auto pos = s.begin();
         CHECK(advance_repeat(pos, s.end(), & ctx));
         CHECK(pos == s.end());
-        CHECK(ctx.from.empty());
-        CHECK(ctx.to.empty());
+        CHECK(ctx.from == 0);
+        CHECK(ctx.to == std::numeric_limits<long>::max());
     }
 
     {
@@ -378,8 +379,8 @@ TEST_CASE("advance_repeat") {
         auto pos = s.begin();
         CHECK(advance_repeat(pos, s.end(), & ctx));
         CHECK(pos == s.end());
-        CHECK(ctx.from == std::string{"10"});
-        CHECK(ctx.to == std::string{"20"});
+        CHECK(ctx.from == 10L);
+        CHECK(ctx.to == 20L);
     }
 
     {
@@ -388,29 +389,10 @@ TEST_CASE("advance_repeat") {
         auto pos = s.begin();
         CHECK(advance_repeat(pos, s.end(), & ctx));
         CHECK_FALSE(pos == s.end());
-        CHECK(ctx.from.empty());
-        CHECK(ctx.to.empty());
+        CHECK(ctx.from == 0);
+        CHECK(ctx.to == std::numeric_limits<long>::max());
     }
 }
-
-struct dummy_comment_context
-{
-    // LCOV_EXCL_START
-    void comment (forward_iterator first, forward_iterator last) {}
-    // LCOV_EXCL_STOP
-};
-
-struct comment_context
-{
-    using forward_iterator = std::string::const_iterator;
-
-    std::string text;
-
-    void comment (forward_iterator first, forward_iterator last)
-    {
-        text = std::string{first, last};
-    }
-};
 
 TEST_CASE("advance_comment") {
     using pfs::parser::abnf::advance_comment;
@@ -429,54 +411,44 @@ TEST_CASE("advance_comment") {
     };
 
     {
-        dummy_comment_context * ctx = nullptr;
-
         for (auto const & item: valid_values) {
             auto pos = item.begin();
-            CHECK(advance_comment(pos, item.end(), ctx));
+            CHECK(advance_comment(pos, item.end()));
             CHECK(pos == item.end());
         }
 
         for (auto const & item: invalid_values) {
             auto pos = item.begin();
-            CHECK_FALSE(advance_comment(pos, item.end(), ctx));
+            CHECK_FALSE(advance_comment(pos, item.end()));
         }
     }
 
     {
-        comment_context ctx;
         std::string s {";"};
         auto pos = s.begin();
-        CHECK(advance_comment(pos, s.end(), & ctx));
+        CHECK(advance_comment(pos, s.end()));
         CHECK(pos == s.end());
-        CHECK(ctx.text.empty());
     }
 
     {
-        comment_context ctx;
         std::string s {";\r\n"};
         auto pos = s.begin();
-        CHECK(advance_comment(pos, s.end(), & ctx));
+        CHECK(advance_comment(pos, s.end()));
         CHECK(pos == s.end());
-        CHECK(ctx.text.empty());
     }
 
     {
-        comment_context ctx;
         std::string s {"; comment "};
         auto pos = s.begin();
-        CHECK(advance_comment(pos, s.end(), & ctx));
+        CHECK(advance_comment(pos, s.end()));
         CHECK(pos == s.end());
-        CHECK(ctx.text == std::string{" comment "});
     }
 
     {
-        comment_context ctx;
         std::string s {"; comment \r\n"};
         auto pos = s.begin();
-        CHECK(advance_comment(pos, s.end(), & ctx));
+        CHECK(advance_comment(pos, s.end()));
         CHECK(pos == s.end());
-        CHECK(ctx.text == std::string{" comment "});
     }
 }
 
@@ -500,17 +472,15 @@ TEST_CASE("advance_comment_newline") {
     };
 
     {
-        dummy_comment_context * ctx = nullptr;
-
         for (auto const & item: valid_values) {
             auto pos = item.begin();
-            CHECK(advance_comment_newline(pos, item.end(), ctx));
+            CHECK(advance_comment_newline(pos, item.end()));
             CHECK(pos == item.end());
         }
 
         for (auto const & item: invalid_values) {
             auto pos = item.begin();
-            CHECK_FALSE(advance_comment_newline(pos, item.end(), ctx));
+            CHECK_FALSE(advance_comment_newline(pos, item.end()));
         }
     }
 }
@@ -537,17 +507,15 @@ TEST_CASE("advance_comment_whitespace") {
     };
 
     {
-        dummy_comment_context * ctx = nullptr;
-
         for (auto const & item: valid_values) {
             auto pos = item.begin();
-            CHECK(advance_comment_whitespace(pos, item.end(), ctx));
+            CHECK(advance_comment_whitespace(pos, item.end()));
             CHECK(pos == item.end());
         }
 
         for (auto const & item: invalid_values) {
             auto pos = item.begin();
-            CHECK_FALSE(advance_comment_whitespace(pos, item.end(), ctx));
+            CHECK_FALSE(advance_comment_whitespace(pos, item.end()));
         }
     }
 }
@@ -668,10 +636,18 @@ struct dummy_element_context
     , virtual public dummy_number_context
     , virtual public dummy_quoted_string_context
     , virtual public dummy_prose_context
-    , virtual public dummy_comment_context
-    , virtual public dummy_repeat_context
 {
+    void repeat (long from, long to) {}
+
     // Below are requirements for GroupContext and OptionContext
+
+    // GroupContext
+    void begin_group () {}
+    void end_group (bool success) {}
+
+    // OptionContext
+    void begin_option () {}
+    void end_option (bool success) {}
 
     // LCOV_EXCL_START
     // ConcatenationContext
@@ -681,6 +657,11 @@ struct dummy_element_context
     // RepetitionContext
     void begin_repetition () {}
     void end_repetition (bool) {}
+
+    // AlternationContext
+    void begin_alternation () {}
+    void end_alternation (bool success) {}
+
     // LCOV_EXCL_STOP
 };
 
@@ -891,7 +872,10 @@ TEST_CASE("advance_concatenation") {
 
 struct dummy_alternation_context
     : dummy_concatenation_context
-{};
+{
+    void begin_alternation () {}
+    void end_alternation (bool success) {}
+};
 
 TEST_CASE("advance_alternation") {
     using pfs::parser::abnf::advance_alternation;
@@ -922,7 +906,11 @@ TEST_CASE("advance_alternation") {
 
 struct dummy_group_context
     : dummy_alternation_context
-{};
+{
+    // GroupContext
+    void begin_group () {}
+    void end_group (bool success) {}
+};
 
 TEST_CASE("advance_group") {
     using pfs::parser::abnf::advance_group;
@@ -948,7 +936,11 @@ TEST_CASE("advance_group") {
 
 struct dummy_option_context
     : dummy_alternation_context
-{};
+{
+    // OptionContext
+    void begin_option () {}
+    void end_option (bool success) {}
+};
 
 TEST_CASE("advance_group") {
     using pfs::parser::abnf::advance_option;
@@ -973,7 +965,6 @@ TEST_CASE("advance_group") {
 }
 
 struct dummy_defined_as_context
-    : public virtual dummy_comment_context
 {
     // LCOV_EXCL_START
     void accept_basic_rule_definition () {}
@@ -1038,8 +1029,11 @@ TEST_CASE("advance_elements") {
 struct dummy_rule_context
     : dummy_alternation_context
     , dummy_defined_as_context
-    , public virtual dummy_comment_context
-{};
+{
+    // RuleContext
+    void begin_rule () {}
+    void end_rule (bool success) {}
+};
 
 TEST_CASE("advance_rule") {
     using pfs::parser::abnf::advance_rule;
@@ -1069,7 +1063,6 @@ TEST_CASE("advance_rule") {
 
 struct dummy_rulelist_context
     : dummy_rule_context
-    , public virtual dummy_comment_context
 {};
 
 TEST_CASE("advance_rulelist") {

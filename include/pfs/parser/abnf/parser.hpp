@@ -14,8 +14,8 @@
 #pragma once
 
 #include "error.hpp"
-#include "pfs/parser/core_rules.hpp"
-#include "pfs/parser/generator.hpp"
+#include "../core_rules.hpp"
+#include "../generator.hpp"
 #include <bitset>
 #include <type_traits>
 
@@ -233,7 +233,13 @@ bool advance_number (ForwardIterator & pos
             // Notify observer no more valid elements parsed
             if (ctx)
                 ctx->last_number(flag, p, p);
+        } else {
+            if (ctx)
+                ctx->last_number(flag, p, p);
         }
+    } else {
+        if (ctx)
+            ctx->last_number(flag, p, p);
     }
 
     return compare_and_assign(pos, p);
@@ -247,7 +253,7 @@ bool advance_number (ForwardIterator & pos
  * @param ctx Structure satisfying requirements of QuotedStringContext
  * @error @c unbalanced_quote if quote is unbalanced.
  * @error @c bad_quoted_char if quoted string contains invalid character.
- * @error @c max_lengh_exceeded if quoted string length too long.
+ * @error @c max_length_exceeded if quoted string length too long.
  * @return @c true if advanced by at least one position, otherwise @c false.
  *
  * @par
@@ -310,7 +316,7 @@ bool advance_quoted_string (ForwardIterator & pos
 
         if (length == max_length) {
             if (ctx) {
-                auto ec = make_error_code(errc::max_lengh_exceeded);
+                auto ec = make_error_code(errc::max_length_exceeded);
                 ctx->error(ec);
             }
             return false;
@@ -347,8 +353,8 @@ bool advance_quoted_string (ForwardIterator & pos
  *
  * @par
  * RepeatContext {
- *     void repeat (ForwardIterator first_from, ForwardIterator last_from
- *          , ForwardIterator first_to, ForwardIterator last_to)
+ *     void repeat (long from, long to)
+ *     void error (error_code ec)
  * }
  *
  * if first_from == last_from -> no low limit (*1)
@@ -404,8 +410,30 @@ bool advance_repeat (ForwardIterator & pos
         }
     } while (false);
 
-    if (p != pos && ctx)
-        ctx->repeat(first_from, last_from, first_to, last_to);
+    if (p != pos && ctx) {
+        auto from = to_decimal_number(first_from, last_from);
+        auto to = to_decimal_number(first_to, last_to);
+
+        if (!from.second) {
+            ctx->error(make_error_code(pfs::parser::errc::bad_repeat_range));
+            return false;
+        }
+
+        if (!to.second) {
+            ctx->error(make_error_code(pfs::parser::errc::bad_repeat_range));
+            return false;
+        }
+
+        if (first_to == last_to)
+            to.first = std::numeric_limits<long>::max();
+
+        if (from.first > to.first) {
+            ctx->error(make_error_code(pfs::parser::errc::bad_repeat_range));
+            return false;
+        }
+
+        ctx->repeat(from.first, to.first);
+    }
 
     return compare_and_assign(pos, p);
 }
@@ -418,21 +446,15 @@ bool advance_repeat (ForwardIterator & pos
  * @param ctx Structure satisfying requirements of CommentContext
  * @return @c true if advanced by at least one position, otherwise @c false.
  *
- * @par
- * CommentContext {
- *     void comment (ForwardIterator first, ForwardIterator last)
- * }
- *
  * @note Grammar
  * comment = ";" *(< neither CR nor LF character >) CRLF
  *
  * This grammar replaces more strict one from RFC 5234:
  * comment = ";" *(WSP / VCHAR) CRLF
  */
-template <typename ForwardIterator, typename CommentContext>
+template <typename ForwardIterator>
 bool advance_comment (ForwardIterator & pos
-    , ForwardIterator last
-    , CommentContext * ctx = nullptr)
+    , ForwardIterator last)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
@@ -452,9 +474,6 @@ bool advance_comment (ForwardIterator & pos
         ++p;
     }
 
-    if (ctx)
-        ctx->comment(first_pos, p);
-
     if (p != last)
         advance_newline(p, last);
 
@@ -472,13 +491,12 @@ bool advance_comment (ForwardIterator & pos
  * @note Grammar
  * c-nl = comment / CRLF ; comment or newline
  */
-template <typename ForwardIterator, typename CommentContext>
+template <typename ForwardIterator>
 inline bool advance_comment_newline (ForwardIterator & pos
-    , ForwardIterator last
-    , CommentContext * ctx = nullptr)
+    , ForwardIterator last)
 {
     return advance_newline(pos, last)
-        || advance_comment(pos, last, ctx);
+        || advance_comment(pos, last);
 }
 
 /**
@@ -492,10 +510,9 @@ inline bool advance_comment_newline (ForwardIterator & pos
  * @note Grammar
  * c-wsp =  WSP / (c-nl WSP)
  */
-template <typename ForwardIterator, typename CommentContext>
+template <typename ForwardIterator>
 inline bool advance_comment_whitespace (ForwardIterator & pos
-    , ForwardIterator last
-    , CommentContext * ctx = nullptr)
+    , ForwardIterator last)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
@@ -506,7 +523,7 @@ inline bool advance_comment_whitespace (ForwardIterator & pos
 
     if (is_whitespace_char(*p)) {
         ++p;
-    } else if (advance_comment_newline(p, last, ctx)) {
+    } else if (advance_comment_newline(p, last)) {
         if (p == last)
             return false;
 
@@ -688,19 +705,18 @@ bool advance_concatenation (ForwardIterator & pos
         ctx->begin_concatenation();
 
     // At least one repetition need
-    if (!advance_repetition(pos, last, ctx))
-        return false;
+    auto success = advance_repetition(pos, last, ctx);
 
     // *(1*c-wsp repetition)
-    return advance_repetition_by_range(pos, last, unlimited_range()
+    success = success && advance_repetition_by_range(pos, last, unlimited_range()
         , [ctx] (ForwardIterator & pos, ForwardIterator last) -> bool {
 
             auto p = pos;
 
             // 1*c-wsp
             if (! advance_repetition_by_range(p, last, make_range(1)
-                    , [ctx] (ForwardIterator & pos, ForwardIterator last) -> bool {
-                        return advance_comment_whitespace(pos, last, ctx);
+                    , [] (ForwardIterator & pos, ForwardIterator last) -> bool {
+                        return advance_comment_whitespace(pos, last);
                     })) {
                 return false;
             }
@@ -710,6 +726,11 @@ bool advance_concatenation (ForwardIterator & pos
 
             return compare_and_assign(pos, p);
         });
+
+    if (ctx)
+        ctx->end_concatenation(success);
+
+    return success;
 }
 
 /**
@@ -722,7 +743,10 @@ bool advance_concatenation (ForwardIterator & pos
  *
  * @par
  * AlternationContext extends ConcatenationContext
- * { }
+ * {
+ *      void begin_alternation ()
+ *      void end_alternation ()
+ * }
  *
  * @note Grammar
  * alternation = concatenation *(*c-wsp "/" *c-wsp concatenation)
@@ -737,18 +761,20 @@ bool advance_alternation (ForwardIterator & pos
     if (pos == last)
         return false;
 
-    if (! advance_concatenation(pos, last, ctx))
-        return false;
+    if (ctx)
+        ctx->begin_alternation();
+
+    auto success = advance_concatenation(pos, last, ctx);
 
     // _________________________________________________
     // |                                               |
     // *(*c-wsp "/" *c-wsp concatenation)              v
-    return advance_repetition_by_range(pos, last, unlimited_range()
+    success = success && advance_repetition_by_range(pos, last, unlimited_range()
         , [ctx] (ForwardIterator & pos, ForwardIterator last) -> bool {
             auto p = pos;
 
             // *c-wsp
-            while (advance_comment_whitespace(p, last, ctx))
+            while (advance_comment_whitespace(p, last))
                 ;
 
             if (p == last)
@@ -763,7 +789,7 @@ bool advance_alternation (ForwardIterator & pos
                 return false;
 
             // *c-wsp
-            while (advance_comment_whitespace(p, last, ctx))
+            while (advance_comment_whitespace(p, last))
                 ;
 
             if (! advance_concatenation(p, last, ctx))
@@ -771,6 +797,11 @@ bool advance_alternation (ForwardIterator & pos
 
             return compare_and_assign(pos, p);
         });
+
+    if (ctx)
+        ctx->end_alternation(success);
+
+    return success;
 }
 
 /* Helper function
@@ -782,26 +813,28 @@ bool advance_alternation (ForwardIterator & pos
 template <typename ForwardIterator, typename GroupContext>
 bool advance_group_or_option (ForwardIterator & pos
     , ForwardIterator last
-    , bool is_group
     , GroupContext * ctx = nullptr)
 {
-    using char_type = typename std::remove_reference<decltype(*pos)>::type;
-
-    char_type opening_bracket = is_group ? char_type('(') : char_type('[');
-    char_type closing_bracket = is_group ? char_type(')') : char_type(']');
+    using char_type = typename std::remove_cv<typename std::remove_reference<decltype(*pos)>::type>::type;
 
     if (pos == last)
         return false;
 
+    char_type closing_bracket {'\x0'};
     auto p = pos;
 
-    if (*p != opening_bracket)
+    if (*p == char_type('(')) {
+        closing_bracket = char_type(')');
+    } else if (*p == char_type('[')) {
+        closing_bracket = char_type(']');
+    } else {
         return false;
+    }
 
     ++p;
 
     // *c-wsp
-    while (advance_comment_whitespace(p, last, ctx))
+    while (advance_comment_whitespace(p, last))
         ;
 
     if (p == last)
@@ -811,7 +844,7 @@ bool advance_group_or_option (ForwardIterator & pos
         return false;
 
     // *c-wsp
-    while (advance_comment_whitespace(p, last, ctx))
+    while (advance_comment_whitespace(p, last))
         ;
 
     if (*p != closing_bracket)
@@ -832,7 +865,10 @@ bool advance_group_or_option (ForwardIterator & pos
  *
  * @par
  * GroupContext extends AlternationContext
- * { }
+ * {
+ *      void begin_group ()
+ *      void end_group (bool success)
+ * }
  *
  * @note Grammar
  * group  = "(" *c-wsp alternation *c-wsp ")"
@@ -842,7 +878,25 @@ bool advance_group (ForwardIterator & pos
     , ForwardIterator last
     , GroupContext * ctx)
 {
-    return advance_group_or_option(pos, last, true, ctx);
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+
+    if (pos == last)
+        return false;
+
+    auto p = pos;
+
+    if (*p != char_type('('))
+        return false;
+
+    if (ctx)
+        ctx->begin_group();
+
+    auto success = advance_group_or_option(pos, last, ctx);
+
+    if (ctx)
+        ctx->end_group(success);
+
+    return success;
 }
 
 /**
@@ -855,7 +909,10 @@ bool advance_group (ForwardIterator & pos
  *
  * @par
  * OptionContext extends AlternationContext
- * { }
+ * {
+ *      void begin_option ()
+ *      void end_option (bool success)
+ * }
  *
  * @note Grammar
  * option = "[" *c-wsp alternation *c-wsp "]"
@@ -865,7 +922,25 @@ bool advance_option (ForwardIterator & pos
     , ForwardIterator last
     , OptionContext * ctx)
 {
-    return advance_group_or_option(pos, last, false, ctx);
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+
+    if (pos == last)
+        return false;
+
+    auto p = pos;
+
+    if (*p != char_type('['))
+        return false;
+
+    if (ctx)
+        ctx->begin_option();
+
+    auto success = advance_group_or_option(pos, last, ctx);
+
+    if (ctx)
+        ctx->end_option(success);
+
+    return success;
 }
 
 /**
@@ -902,7 +977,7 @@ bool advance_defined_as (ForwardIterator & pos
     auto p = pos;
 
     // *c-wsp
-    while (advance_comment_whitespace(p, last, ctx))
+    while (advance_comment_whitespace(p, last))
         ;
 
     if (p == last)
@@ -922,7 +997,7 @@ bool advance_defined_as (ForwardIterator & pos
     }
 
     // *c-wsp
-    while (advance_comment_whitespace(p, last, ctx))
+    while (advance_comment_whitespace(p, last))
         ;
 
     if (ctx) {
@@ -961,7 +1036,7 @@ bool advance_elements (ForwardIterator & pos
         return false;
 
     // *c-wsp
-    while (advance_comment_whitespace(p, last, ctx))
+    while (advance_comment_whitespace(p, last))
         ;
 
     return compare_and_assign(pos, p);
@@ -980,7 +1055,10 @@ bool advance_elements (ForwardIterator & pos
  *      , ElementsContext
  *      , DefinedAsContext
  *      , CommentContext
- * {}
+ * {
+ *      void begin_rule ();
+ *      void end_rule (bool success);
+ * }
  *
  * @note Grammar
  * rule = rulename defined-as elements c-nl
@@ -994,21 +1072,27 @@ bool advance_rule (ForwardIterator & pos
 {
     auto p = pos;
 
-    if (!advance_rulename(p, last, ctx))
+    if (pos == last)
         return false;
 
-    if (!advance_defined_as(p, last, ctx))
-        return false;
+    if (ctx)
+        ctx->begin_rule();
 
-    if (!advance_elements(p, last, ctx))
-        return false;
+    bool success = advance_rulename(p, last, ctx);
+    success = success && advance_defined_as(p, last, ctx);
+    success = success && advance_elements(p, last, ctx);
 
     if (p != last) {
-        if (!advance_comment_newline(p, last, ctx))
-            return false;
+        success = success && advance_comment_newline(p, last);
     }
 
-    return compare_and_assign(pos, p);
+    while (advance_linear_whitespace(p, last))
+        ;
+
+    if (ctx)
+        ctx->end_rule(success);
+
+    return success && compare_and_assign(pos, p);
 }
 
 /**
@@ -1041,11 +1125,11 @@ bool advance_rulelist (ForwardIterator & pos
                 ;
             } else {
                 // *c-wsp
-                while (advance_comment_whitespace(p, last, ctx))
+                while (advance_comment_whitespace(p, last))
                     ;
 
                 if (p != last) {
-                    if (!advance_comment_newline(p, last, ctx))
+                    if (!advance_comment_newline(p, last))
                         return false;
                 }
             }
