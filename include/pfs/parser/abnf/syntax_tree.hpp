@@ -43,7 +43,6 @@ enum class node_enum
     , prose
     , number
     , quoted_string
-    , comment
     , rulename
     , repetition
     , group
@@ -176,22 +175,9 @@ public:
     {}
 };
 
-////////////////////////////////////////////////////////////////////////////////
-// comment_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class comment_node : public string_node<StringType>
-{
-    using base_class = string_node<StringType>;
-
-public:
-    comment_node (StringType && text)
-        : base_class(node_enum::comment, std::forward<StringType>(text))
-    {}
-};
 
 ////////////////////////////////////////////////////////////////////////////////
-// comment_node
+// rulename_node
 ////////////////////////////////////////////////////////////////////////////////
 template <typename StringType>
 class rulename_node : public string_node<StringType>
@@ -205,7 +191,7 @@ public:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// comment_node
+// repetition_node
 ////////////////////////////////////////////////////////////////////////////////
 template <typename StringType>
 class repetition_node : public basic_node
@@ -365,51 +351,6 @@ public:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// rule_spec
-////////////////////////////////////////////////////////////////////////////////
-// template <typename StringType>
-// class rule_spec final
-// {
-// public:
-//     using string_type = StringType;
-//
-// private:
-//     string_type _name;
-//
-// public:
-//     rule_spec () = delete;
-//     ~rule_spec () = default;
-//
-//     rule_spec (rule_spec const &) = delete;
-//     rule_spec & operator = (rule_spec const &) = delete;
-//
-//     rule_spec (rule_spec &&) = default;
-//     rule_spec & operator = (rule_spec &&) = default;
-// };
-
-////////////////////////////////////////////////////////////////////////////////
-// syntax_tree
-////////////////////////////////////////////////////////////////////////////////
-
-// template <typename StringType>
-// class syntax_tree final
-// {
-//     using rule_spec_type = rule_spec<StringType>;
-//
-//     std::vector<rule_spec_type> _rules;
-//
-// public:
-//     syntax_tree () = default;
-//     ~syntax_tree () = default;
-//
-//     syntax_tree (syntax_tree const & other) = delete;
-//     syntax_tree & operator = (syntax_tree const & other) = delete;
-//
-//     syntax_tree (syntax_tree && other) = default;
-//     syntax_tree & operator = (syntax_tree && other) = default;
-// };
-
-////////////////////////////////////////////////////////////////////////////////
 // syntax_tree_cotext
 ////////////////////////////////////////////////////////////////////////////////
 template <typename ForwardIterator, typename StringType>
@@ -420,7 +361,6 @@ class syntax_tree_context
     using prose_node_type = prose_node<string_type>;
     using number_node_type = number_node<string_type>;
     using quoted_string_node_type = quoted_string_node<string_type>;
-    using comment_node_type = comment_node<string_type>;
     using rulename_node_type = rulename_node<string_type>;
     using repetition_node_type = repetition_node<string_type>;
     using group_node_type = group_node<string_type>;
@@ -432,20 +372,21 @@ class syntax_tree_context
     using aggregate_node_type = aggregate_node<string_type>;
 
     rulelist_node_type * _rulelist {nullptr};
-    std::stack<std::unique_ptr<basic_node>> _node_stack;
+    std::stack<std::unique_ptr<basic_node>> _stack;
 
 #if PFS_SYNTAX_TREE_TRACE_ENABLE
     int _indent_level = 0;
+    int _indent_step = 4;
 
     string_type indent ()
     {
-        //return string_type{1, '|'} + string_type(_indent_level * 2, '_');
+        //return string_type{1, '|'} + string_type(_indent_level * _indent_step, '_');
 
         string_type result {1, '|'};
         auto i = _indent_level;
 
         while (i--) {
-            result += string_type(2, '_');
+            result += string_type(_indent_step, '-');
 
             if (i > 0)
                 result += string_type(1, '|');
@@ -458,26 +399,39 @@ class syntax_tree_context
 private:
     inline aggregate_node_type * check_aggregate_node ()
     {
-        assert(!_node_stack.empty());
-        auto & node = _node_stack.top();
+        assert(!_stack.empty());
+        auto & node = _stack.top();
         assert(node->is_aggregate_node());
         return static_cast<aggregate_node_type *>(& *node);
     }
 
     inline number_node_type * check_number_node ()
     {
-        assert(!_node_stack.empty());
-        auto & node = _node_stack.top();
+        assert(!_stack.empty());
+        auto & node = _stack.top();
         assert(node->type() == node_enum::number);
         return static_cast<number_node_type *>(& *node);
     }
 
     inline repetition_node_type * check_repetition_node ()
     {
-        assert(!_node_stack.empty());
-        auto & node = _node_stack.top();
+        assert(!_stack.empty());
+        auto & node = _stack.top();
         assert(node->type() == node_enum::repetition);
         return static_cast<repetition_node_type *>(& *node);
+    }
+
+    inline void end_aggregate_component (bool success)
+    {
+        assert(!_stack.empty());
+
+        auto item = std::move(_stack.top());
+        _stack.pop();
+
+        if (success) {
+            auto cn = check_aggregate_node();
+            cn->push_back(std::move(item));
+        }
     }
 
 public:
@@ -485,7 +439,7 @@ public:
     {
         auto rulelist = make_unique<rulelist_node_type>();
         _rulelist = & *rulelist;
-        _node_stack.push(std::move(rulelist));
+        _stack.push(std::move(rulelist));
     }
 
     size_t rules_count () const
@@ -533,7 +487,7 @@ public:
 
         auto num = make_unique<number_node_type>(flag);
         num->set_first(std::move(value));
-        _node_stack.push(std::move(num));
+        _stack.push(std::move(num));
     }
 
     void last_number (pfs::parser::abnf::number_flag
@@ -556,8 +510,8 @@ public:
             cn->push_next(std::move(value));
         }
 
-        auto & num = _node_stack.top();
-        _node_stack.pop();
+        auto & num = _stack.top();
+        _stack.pop();
 
         auto rep = check_repetition_node();
         rep->set_element(std::move(num));
@@ -598,9 +552,8 @@ public:
             std::cout << indent() << "BEGIN group\n"
         ));
 
-        // TODO
         auto gr = make_unique<group_node_type>();
-        _node_stack.push(std::move(gr));
+        _stack.push(std::move(gr));
 
         PFS_SYNTAX_TREE_TRACE((++_indent_level));
     }
@@ -609,9 +562,15 @@ public:
     {
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
-        // TODO Implement
-        assert(!_node_stack.empty());
-        _node_stack.pop();
+        assert(!_stack.empty());
+
+        auto gr = std::move(_stack.top());
+        _stack.pop();
+
+        if (success) {
+            auto cn = check_repetition_node();
+            cn->set_element(std::move(gr));
+        }
 
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "END group: " << (success ? "YES" : "NO") << "\n"
@@ -625,9 +584,8 @@ public:
             std::cout << indent() << "BEGIN option\n"
         ));
 
-        // TODO
         auto opt = make_unique<option_node_type>();
-        _node_stack.push(std::move(opt));
+        _stack.push(std::move(opt));
 
         PFS_SYNTAX_TREE_TRACE((++_indent_level));
     }
@@ -636,38 +594,29 @@ public:
     {
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
-        // TODO Implement
-        assert(!_node_stack.empty());
-        _node_stack.pop();
+        assert(!_stack.empty());
+
+        auto opt = std::move(_stack.top());
+        _stack.pop();
+
+        if (success) {
+            auto cn = check_repetition_node();
+            cn->set_element(std::move(opt));
+        }
 
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "END option: " << (success ? "YES" : "NO") << "\n"
         ));
     }
 
-    // CommentContext
-    void comment (forward_iterator first, forward_iterator last)
-    {
-        auto value = string_type(first.base(), last.base());
-
-        PFS_SYNTAX_TREE_TRACE((
-            std::cout << indent() << "comment: \"" << value << "\"\n"
-        ));
-
-        auto cn = check_aggregate_node();
-        auto com = make_unique<comment_node_type>(std::move(value));
-        cn->push_back(std::move(com));
-    }
-
     // RepeatContext
     void repeat (long from, long to)
     {
-        auto cn = check_repetition_node();
-
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "repeat: " << from << '-' << to << "\n"
         ));
 
+        auto cn = check_repetition_node();
         cn->set_range(from, to);
     }
 
@@ -680,8 +629,8 @@ public:
             std::cout << indent() << "rulename: \"" << value << "\"\n"
         ));
 
-        assert(!_node_stack.empty());
-        auto & node = _node_stack.top();
+        assert(!_stack.empty());
+        auto & node = _stack.top();
 
         if (node->type() == node_enum::rule) {
             auto cn = static_cast<rule_node_type *>(& *node);
@@ -700,11 +649,8 @@ public:
             std::cout << indent() << "BEGIN repetition\n"
         ));
 
-        // FIXME
-//         auto cn = check_aggregate_node();
         auto rep = make_unique<repetition_node_type>();
-        _node_stack.push(std::move(rep));
-//         cn->push_back(std::move(rep));
+        _stack.push(std::move(rep));
 
         PFS_SYNTAX_TREE_TRACE((++_indent_level));
     }
@@ -713,16 +659,7 @@ public:
     {
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
-        assert(!_node_stack.empty());
-        // FIXME
-//         auto top = _node_stack.top()
-        _node_stack.pop();
-//
-//         if (success) {
-//             _node_stack.pop();
-//         } else {
-//
-//         }
+        end_aggregate_component(success);
 
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "END repetition: " << (success ? "YES" : "NO") << "\n"
@@ -736,10 +673,8 @@ public:
             std::cout << indent() << "BEGIN alternation\n"
         ));
 
-        // TODO Implement
-
         auto alt = make_unique<alternation_node_type>();
-        _node_stack.push(std::move(alt));
+        _stack.push(std::move(alt));
 
         PFS_SYNTAX_TREE_TRACE((++_indent_level));
     }
@@ -748,8 +683,7 @@ public:
     {
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
-        // TODO Implement
-        _node_stack.pop();
+        end_aggregate_component(success);
 
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "END alternation: " << (success ? "YES" : "NO") << "\n"
@@ -763,10 +697,8 @@ public:
             std::cout << indent() << "BEGIN concatenation\n"
         ));
 
-        // TODO Implement
-
         auto cat = make_unique<concatenation_node_type>();
-        _node_stack.push(std::move(cat));
+        _stack.push(std::move(cat));
 
         PFS_SYNTAX_TREE_TRACE((++_indent_level));
     }
@@ -775,9 +707,7 @@ public:
     {
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
-        // TODO Implement
-
-        _node_stack.pop();
+        end_aggregate_component(success);
 
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "END concatenation: " << (success ? "YES" : "NO") << "\n"
@@ -791,11 +721,8 @@ public:
             std::cout << indent() << "BEGIN rule\n"
         ));
 
-        // FIXME
-//         auto cn = check_aggregate_node();
         auto rule = make_unique<rule_node_type>();
-        _node_stack.push(std::move(rule));
-//         cn->push_back(std::move(rule));
+        _stack.push(std::move(rule));
 
         PFS_SYNTAX_TREE_TRACE((++_indent_level));
     };
@@ -804,8 +731,7 @@ public:
     {
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
-        // FIXME
-        _node_stack.pop();
+        end_aggregate_component(success);
 
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "END rule: " << (success ? "YES" : "NO") << "\n"
@@ -833,5 +759,27 @@ public:
     }
 };
 
+
+////////////////////////////////////////////////////////////////////////////////
+// syntax_tree
+////////////////////////////////////////////////////////////////////////////////
+
+// template <typename StringType>
+// class syntax_tree final
+// {
+//     using rule_spec_type = rule_spec<StringType>;
+//
+//     std::vector<rule_spec_type> _rules;
+//
+// public:
+//     syntax_tree () = default;
+//     ~syntax_tree () = default;
+//
+//     syntax_tree (syntax_tree const & other) = delete;
+//     syntax_tree & operator = (syntax_tree const & other) = delete;
+//
+//     syntax_tree (syntax_tree && other) = default;
+//     syntax_tree & operator = (syntax_tree && other) = default;
+// };
 
 }}} // pfs::parser::abnf

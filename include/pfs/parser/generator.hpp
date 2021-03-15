@@ -29,43 +29,6 @@ inline repeat_range unlimited_range ()
     return make_range();
 }
 
-// Convert sequence '1*DIGIT' to integer value.
-// Returns on error:
-//      {0, false} if non-digit character found;
-//      {std::numeric_limits<long>::max(), false} if overflow occured.
-template <typename ForwardIterator>
-std::pair<long, bool> to_decimal_number (ForwardIterator first, ForwardIterator last)
-{
-    using char_type = typename std::remove_reference<decltype(*first)>::type;
-    constexpr int radix = 10;
-    long result = 0;
-    long cutoff_value = std::numeric_limits<long>::min() / radix;
-    long cutoff_limit = std::numeric_limits<long>::min() % radix;
-
-    cutoff_value *= -1;
-    cutoff_limit *= -1;
-
-    for (; first != last; ++first) {
-        auto digit = uint32_t(*first) - uint32_t(char_type('0'));
-
-        if (digit < 0 || digit > 9) {
-            // Character is not a digit
-            return std::make_pair(long{0}, false);
-        }
-
-        if (result < cutoff_value
-                || (result == cutoff_value && static_cast<uintmax_t>(digit) <= cutoff_limit)) {
-            result *= radix;
-            result += static_cast<long>(digit);
-        } else {
-            // Too big, overflow
-            return std::make_pair(std::numeric_limits<long>::max(), false);
-        }
-    }
-
-    return std::make_pair(result, true);
-}
-
 /**
  * @brief Advance by repetition.
  *
