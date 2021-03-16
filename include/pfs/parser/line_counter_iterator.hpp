@@ -20,6 +20,9 @@ struct line_counter_iterator
     bool _is_CR = false;
 
 public:
+    line_counter_iterator ()
+    {}
+
     line_counter_iterator (ForwardIterator initial)
         : _it(initial)
     {}

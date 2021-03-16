@@ -994,14 +994,6 @@ TEST_CASE("advance_group") {
     }
 }
 
-struct dummy_defined_as_context
-{
-    // LCOV_EXCL_START
-    void accept_basic_rule_definition () {}
-    void accept_incremental_alternatives () {}
-    // LCOV_EXCL_STOP
-};
-
 TEST_CASE("advance_defined_as") {
     using pfs::parser::abnf::advance_defined_as;
 
@@ -1013,14 +1005,13 @@ TEST_CASE("advance_defined_as") {
         , { true, 8, {';', '\n', '\t', '=', '/', ';', '\n', ' '} }
     };
 
-    dummy_defined_as_context * ctx = nullptr;
-
     for (auto const & item : test_values) {
         auto first = item.data.begin();
         auto last = item.data.end();
         auto pos = first;
+        bool is_incremental_alternatives = false;
 
-        auto result = advance_defined_as(pos, last, ctx);
+        auto result = advance_defined_as(pos, last, is_incremental_alternatives);
 
         CHECK(result == item.success);
         CHECK(static_cast<int>(std::distance(first, pos)) == item.distance);
@@ -1058,11 +1049,10 @@ TEST_CASE("advance_elements") {
 
 struct dummy_rule_context
     : dummy_alternation_context
-    , dummy_defined_as_context
 {
     // RuleContext
-    void begin_rule () {}
-    void end_rule (bool success) {}
+    void begin_rule (forward_iterator, forward_iterator, bool) {}
+    void end_rule (forward_iterator, forward_iterator, bool, bool) {}
 };
 
 TEST_CASE("advance_rule") {

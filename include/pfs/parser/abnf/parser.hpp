@@ -575,6 +575,42 @@ inline bool advance_comment_whitespace (ForwardIterator & pos
     return compare_and_assign(pos, p);
 }
 
+//
+// Helper function for advance_rulename() and advance_rule()
+//
+template <typename ForwardIterator>
+bool advance_rulename_helper (ForwardIterator & pos
+    , ForwardIterator last
+    , ForwardIterator & rulename_first
+    , ForwardIterator & rulename_last)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+
+//     if (pos == last)
+//         return false;
+
+    auto p = pos;
+
+    if (!is_alpha_char(*p))
+        return false;
+
+    ForwardIterator first_pos = p;
+
+    ++p;
+
+    while (p != last
+        && (is_alpha_char(*p)
+            || is_digit_char(*p)
+            || *p == char_type('-'))) {
+        ++p;
+    }
+
+    rulename_first = first_pos;
+    rulename_last = p;
+
+    return compare_and_assign(pos, p);
+}
+
 /**
  * @brief Advance by rule name.
  *
@@ -601,26 +637,16 @@ bool advance_rulename (ForwardIterator & pos
     if (pos == last)
         return false;
 
-    auto p = pos;
+    ForwardIterator rulename_first {pos};
+    ForwardIterator rulename_last {pos};
 
-    if (!is_alpha_char(*p))
+    if (!advance_rulename_helper(pos, last, rulename_first, rulename_last))
         return false;
 
-    ForwardIterator first_pos = p;
-
-    ++p;
-
-    while (p != last
-        && (is_alpha_char(*p)
-            || is_digit_char(*p)
-            || *p == char_type('-'))) {
-        ++p;
-    }
-
     if (ctx)
-        ctx->rulename(first_pos, p);
+        ctx->rulename(rulename_first, rulename_last);
 
-    return compare_and_assign(pos, p);
+    return true;
 }
 
 // Forward decalration for advance_group() and advance_option()
@@ -985,32 +1011,26 @@ bool advance_option (ForwardIterator & pos
  *
  * @param pos On input - first position, on output - last good position.
  * @param last End of sequence position.
- * @param ctx Structure satisfying requirements of DefinedAsContext
+ * @param is_incremental_alternatives On output - @c false if it is a basic
+ *        rule definition, @c true if it is an incremental alternative.
  * @return @c true if advanced by at least one position, otherwise @c false.
- *
- * @par
- * DefinedAsContext extends CommentContext
- * {
- *      void accept_basic_rule_definition ();
- *      void accept_incremental_alternatives ();
- * }
  *
  * @note Grammar
  * defined-as = *c-wsp ("=" / "=/") *c-wsp
  *          ; basic rules definition and
  *          ; incremental alternatives
  */
-template <typename ForwardIterator, typename DefinedAsContext>
+template <typename ForwardIterator>
 bool advance_defined_as (ForwardIterator & pos
     , ForwardIterator last
-    , DefinedAsContext * ctx = nullptr)
+    , bool & is_incremental_alternatives)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
     if (pos == last)
         return false;
 
-    bool is_basic_rules_definition = true;
+    is_incremental_alternatives = false;
     auto p = pos;
 
     // *c-wsp
@@ -1026,7 +1046,7 @@ bool advance_defined_as (ForwardIterator & pos
         if (p != last) {
             if (*p == char_type('/')) {
                 ++p;
-                is_basic_rules_definition = false;
+                is_incremental_alternatives = true;
             }
         }
     } else {
@@ -1036,13 +1056,6 @@ bool advance_defined_as (ForwardIterator & pos
     // *c-wsp
     while (advance_comment_whitespace(p, last))
         ;
-
-    if (ctx) {
-        if (is_basic_rules_definition)
-            ctx->accept_basic_rule_definition();
-        else
-            ctx->accept_incremental_alternatives();
-    }
 
     return compare_and_assign(pos, p);
 }
@@ -1093,8 +1106,13 @@ bool advance_elements (ForwardIterator & pos
  *      , DefinedAsContext
  *      , CommentContext
  * {
- *      void begin_rule ();
- *      void end_rule (bool success);
+ *      void begin_rule (ForwardIterator rulename_first
+ *          , ForwardIterator rulename_last
+ *          , bool is_incremental_alternatives);
+ *      void end_rule (ForwardIterator rulename_first
+ *          , ForwardIterator rulename_last
+ *          , is_incremental_alternatives
+ *          , bool success);
  * }
  *
  * @note Grammar
@@ -1112,12 +1130,21 @@ bool advance_rule (ForwardIterator & pos
     if (pos == last)
         return false;
 
-    if (ctx)
-        ctx->begin_rule();
+    ForwardIterator rulename_first {p};
+    ForwardIterator rulename_last {p};
 
-    bool success = advance_rulename(p, last, ctx);
-    success = success && advance_defined_as(p, last, ctx);
-    success = success && advance_elements(p, last, ctx);
+    if (!advance_rulename_helper(p, last, rulename_first, rulename_last))
+        return false;
+
+    bool is_incremental_alternatives = false;
+
+    if (!advance_defined_as(p, last, is_incremental_alternatives))
+        return false;
+
+    if (ctx)
+        ctx->begin_rule(rulename_first, rulename_last, is_incremental_alternatives);
+
+    auto success = advance_elements(p, last, ctx);
 
     if (p != last) {
         success = success && advance_comment_newline(p, last);
@@ -1126,8 +1153,11 @@ bool advance_rule (ForwardIterator & pos
     while (advance_linear_whitespace(p, last))
         ;
 
-    if (ctx)
-        ctx->end_rule(success);
+    if (ctx) {
+        ctx->end_rule(rulename_first, rulename_last
+            , is_incremental_alternatives
+            , success);
+    }
 
     return success && compare_and_assign(pos, p);
 }

@@ -8,6 +8,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "../line_counter_iterator.hpp"
+#include <map>
 #include <stack>
 #include <vector>
 #include <cassert>
@@ -371,6 +372,7 @@ class syntax_tree_context
     using rulelist_node_type = rulelist_node<string_type>;
     using aggregate_node_type = aggregate_node<string_type>;
 
+private:
     rulelist_node_type * _rulelist {nullptr};
     std::stack<std::unique_ptr<basic_node>> _stack;
 
@@ -573,7 +575,7 @@ public:
         }
 
         PFS_SYNTAX_TREE_TRACE((
-            std::cout << indent() << "END group: " << (success ? "YES" : "NO") << "\n"
+            std::cout << indent() << "END group: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
     }
 
@@ -605,7 +607,7 @@ public:
         }
 
         PFS_SYNTAX_TREE_TRACE((
-            std::cout << indent() << "END option: " << (success ? "YES" : "NO") << "\n"
+            std::cout << indent() << "END option: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
     }
 
@@ -629,17 +631,9 @@ public:
             std::cout << indent() << "rulename: \"" << value << "\"\n"
         ));
 
-        assert(!_stack.empty());
-        auto & node = _stack.top();
-
-        if (node->type() == node_enum::rule) {
-            auto cn = static_cast<rule_node_type *>(& *node);
-            cn->set_name(std::move(value));
-        } else {
-            auto cn = check_repetition_node();
-            auto rn = make_unique<rulename_node_type>(std::move(value));
-            cn->set_element(std::move(rn));
-        }
+        auto cn = check_repetition_node();
+        auto rn = make_unique<rulename_node_type>(std::move(value));
+        cn->set_element(std::move(rn));
     }
 
     // RepetitionContext
@@ -662,7 +656,7 @@ public:
         end_aggregate_component(success);
 
         PFS_SYNTAX_TREE_TRACE((
-            std::cout << indent() << "END repetition: " << (success ? "YES" : "NO") << "\n"
+            std::cout << indent() << "END repetition: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
     }
 
@@ -686,7 +680,7 @@ public:
         end_aggregate_component(success);
 
         PFS_SYNTAX_TREE_TRACE((
-            std::cout << indent() << "END alternation: " << (success ? "YES" : "NO") << "\n"
+            std::cout << indent() << "END alternation: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
     }
 
@@ -710,52 +704,49 @@ public:
         end_aggregate_component(success);
 
         PFS_SYNTAX_TREE_TRACE((
-            std::cout << indent() << "END concatenation: " << (success ? "YES" : "NO") << "\n"
+            std::cout << indent() << "END concatenation: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
     }
 
-    // RuleContext
-    void begin_rule ()
+    void begin_rule (forward_iterator first, forward_iterator last
+        , bool is_incremental_alternatives)
     {
-        PFS_SYNTAX_TREE_TRACE((
-            std::cout << indent() << "BEGIN rule\n"
-        ));
+        auto value = string_type(first.base(), last.base());
 
-        auto rule = make_unique<rule_node_type>();
-        _stack.push(std::move(rule));
+        if (is_incremental_alternatives) {
+            PFS_SYNTAX_TREE_TRACE((
+                std::cout << indent() << "BEGIN incremental alternative rule: " << value << "\n"
+            ));
+
+            // FIXME Need to design the technique to add incremental alternatives
+        } else {
+            PFS_SYNTAX_TREE_TRACE((
+                std::cout << indent() << "BEGIN basic rule definition: " << value << "\n"
+            ));
+
+            auto rule = make_unique<rule_node_type>();
+            _stack.push(std::move(rule));
+        }
 
         PFS_SYNTAX_TREE_TRACE((++_indent_level));
     };
 
-    void end_rule (bool success)
+    void end_rule (forward_iterator first, forward_iterator last
+        , bool is_incremental_alternatives
+        , bool success)
     {
+        auto value = string_type(first.base(), last.base());
+
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
-        end_aggregate_component(success);
+        if (! is_incremental_alternatives) {
+            end_aggregate_component(success);
+        }
 
         PFS_SYNTAX_TREE_TRACE((
-            std::cout << indent() << "END rule: " << (success ? "YES" : "NO") << "\n"
+            std::cout << indent() << "END rule: " << value
+                << ": " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
-    }
-
-    // DefinedAsContext
-    void accept_basic_rule_definition ()
-    {
-        PFS_SYNTAX_TREE_TRACE((
-            std::cout << indent() << "accept_basic_rule_definition\n"
-        ));
-
-        /*rulenames++;*/
-        // TODO Implement
-    }
-
-    void accept_incremental_alternatives ()
-    {
-        PFS_SYNTAX_TREE_TRACE((
-            std::cout << indent() << "accept_incremental_alternatives\n"
-        ));
-
-        // TODO Implement
     }
 };
 

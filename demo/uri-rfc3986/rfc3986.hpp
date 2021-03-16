@@ -74,12 +74,14 @@ public:
     void end_concatenation (bool success) {}
 
     // RuleContext
-    void begin_rule () {}
-    void end_rule (bool success) {}
+    void begin_rule (forward_iterator, forward_iterator
+        , bool is_incremental_alternatives)
+    {
+        if (!is_incremental_alternatives)
+            rulenames++;
+    }
 
-    // DefinedAsContext
-    void accept_basic_rule_definition () { rulenames++; }
-    void accept_incremental_alternatives () {}
+    void end_rule (forward_iterator, forward_iterator, bool, bool) {}
 };
 
 }} // grammar::rfc3986

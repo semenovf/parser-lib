@@ -23,14 +23,15 @@ struct test_item
 };
 
 static std::vector<test_item> data_files {
-      { "data/wsp.grammar", 1 }
-    , { "data/prose.grammar", 1 }
-    , { "data/comment.grammar", 1 }
-    , { "data/abnf.grammar", 37 }
-    , { "data/json-rfc4627.grammar", 30 }
-    , { "data/json-rfc8259.grammar", 30 }
-    , { "data/uri-rfc3986.grammar", 36 }
-    , { "data/uri-geo-rfc58070.grammar", 27 }
+//       { "data/wsp.grammar", 1 }
+//     , { "data/prose.grammar", 1 }
+//     , { "data/comment.grammar", 1 }
+    { "data/incremental-alternatives.grammar", 1 }
+//     , { "data/abnf.grammar", 37 }
+//     , { "data/json-rfc4627.grammar", 30 }
+//     , { "data/json-rfc8259.grammar", 30 }
+//     , { "data/uri-rfc3986.grammar", 36 }
+//     , { "data/uri-geo-rfc58070.grammar", 27 }
 };
 
 using string_type = std::string;
