@@ -75,7 +75,7 @@ TEST_CASE("is_prose_value_char") {
 struct dummy_prose_context
 {
     // LCOV_EXCL_START
-    void prose (forward_iterator, forward_iterator) {}
+    bool prose (forward_iterator, forward_iterator) { return true; }
     // LCOV_EXCL_STOP
 };
 
@@ -122,9 +122,9 @@ TEST_CASE("advance_prose") {
 struct dummy_number_context
 {
     // LCOV_EXCL_START
-    void first_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
-    void last_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
-    void next_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
+    bool first_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) { return true; }
+    bool last_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) { return true; }
+    bool next_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) { return true; }
     // LCOV_EXCL_STOP
 };
 
@@ -210,13 +210,14 @@ struct quoted_string_context
         max_length = limit;
     }
 
-    void quoted_string (std::string::const_iterator first
+    bool quoted_string (std::string::const_iterator first
         , std::string::const_iterator last)
     {
         result_str = std::string(first, last);
+        return true;
     }
 
-    void error (error_code ec)
+    void error (error_code ec, std::string::const_iterator)
     {
         result_ec = ec;
     }
@@ -230,8 +231,8 @@ struct quoted_string_context
 struct dummy_quoted_string_context
 {
     // LCOV_EXCL_START
-    void quoted_string (forward_iterator, forward_iterator) {}
-    void error (error_code) {}
+    bool quoted_string (forward_iterator, forward_iterator) { return true; }
+    void error (error_code, forward_iterator) {}
     size_t max_quoted_string_length () { return 0; }
     // LCOV_EXCL_STOP
 };
@@ -309,8 +310,8 @@ TEST_CASE("advance_quoted_string") {
 struct dummy_repeat_context
 {
     // LCOV_EXCL_START
-    void repeat (long from, long to) {}
-    void error (error_code ec) {}
+    bool repeat (long from, long to) { return true; }
+    void error (error_code ec, forward_iterator) {}
     // LCOV_EXCL_STOP
 };
 
@@ -321,13 +322,14 @@ struct repeat_context
     long from;
     long to;
 
-    void repeat (long f, long t)
+    bool repeat (long f, long t)
     {
         from = f;
         to = t;
+        return true;
     }
 
-    void error (error_code ec) {}
+    void error (error_code ec, forward_iterator) {}
 };
 
 TEST_CASE("advance_repeat") {
@@ -553,7 +555,7 @@ TEST_CASE("advance_comment_whitespace") {
 struct dummy_rulename_context
 {
     // LCOV_EXCL_START
-    void rulename (forward_iterator first, forward_iterator last) {}
+    bool rulename (forward_iterator first, forward_iterator last) { return true; }
     // LCOV_EXCL_STOP
 };
 
@@ -667,30 +669,30 @@ struct dummy_element_context
     , virtual public dummy_quoted_string_context
     , virtual public dummy_prose_context
 {
-    void repeat (long from, long to) {}
+    bool repeat (long from, long to) { return true; }
 
     // Below are requirements for GroupContext and OptionContext
 
     // GroupContext
-    void begin_group () {}
-    void end_group (bool success) {}
+    bool begin_group () { return true; }
+    bool end_group (bool success) { return true; }
 
     // OptionContext
-    void begin_option () {}
-    void end_option (bool success) {}
+    bool begin_option () { return true; }
+    bool end_option (bool success) { return true; }
 
     // LCOV_EXCL_START
     // ConcatenationContext
-    void begin_concatenation () {}
-    void end_concatenation (bool ) {}
+    bool begin_concatenation () { return true; }
+    bool end_concatenation (bool ) { return true; }
 
     // RepetitionContext
-    void begin_repetition () {}
-    void end_repetition (bool) {}
+    bool begin_repetition () { return true; }
+    bool end_repetition (bool) { return true; }
 
     // AlternationContext
-    void begin_alternation () {}
-    void end_alternation (bool success) {}
+    bool begin_alternation () { return true; }
+    bool end_alternation (bool success) { return true; }
 
     // LCOV_EXCL_STOP
 };
@@ -809,8 +811,8 @@ struct dummy_repetition_context
     : dummy_element_context
 {
     // LCOV_EXCL_START
-    void begin_repetition () {}
-    void end_repetition (bool) {}
+    bool begin_repetition () { return true; }
+    bool end_repetition (bool) { return true; }
     // LCOV_EXCL_STOP
 };
 
@@ -871,8 +873,8 @@ struct dummy_concatenation_context
     : dummy_repetition_context
 {
     // LCOV_EXCL_START
-    void begin_concatenation () {}
-    void end_concatenation (bool ) {}
+    bool begin_concatenation () { return true; }
+    bool end_concatenation (bool ) { return true; }
     // LCOV_EXCL_STOP
 };
 
@@ -903,8 +905,8 @@ TEST_CASE("advance_concatenation") {
 struct dummy_alternation_context
     : dummy_concatenation_context
 {
-    void begin_alternation () {}
-    void end_alternation (bool success) {}
+    bool begin_alternation () { return true; }
+    bool end_alternation (bool success) { return true; }
 };
 
 TEST_CASE("advance_alternation") {
@@ -938,8 +940,8 @@ struct dummy_group_context
     : dummy_alternation_context
 {
     // GroupContext
-    void begin_group () {}
-    void end_group (bool success) {}
+    bool begin_group () { return true; }
+    bool end_group (bool success) { return true; }
 };
 
 TEST_CASE("advance_group") {
@@ -968,8 +970,8 @@ struct dummy_option_context
     : dummy_alternation_context
 {
     // OptionContext
-    void begin_option () {}
-    void end_option (bool success) {}
+    bool begin_option () { return true; }
+    bool end_option (bool success) { return true; }
 };
 
 TEST_CASE("advance_group") {
@@ -1051,8 +1053,8 @@ struct dummy_rule_context
     : dummy_alternation_context
 {
     // RuleContext
-    void begin_rule (forward_iterator, forward_iterator, bool) {}
-    void end_rule (forward_iterator, forward_iterator, bool, bool) {}
+    bool begin_rule (forward_iterator, forward_iterator, bool) { return true; }
+    bool end_rule (forward_iterator, forward_iterator, bool, bool) { return true; }
 };
 
 TEST_CASE("advance_rule") {
@@ -1083,7 +1085,10 @@ TEST_CASE("advance_rule") {
 
 struct dummy_rulelist_context
     : dummy_rule_context
-{};
+{
+    bool begin_document () { return true; }
+    bool end_document (bool) { return true; }
+};
 
 TEST_CASE("advance_rulelist") {
     using pfs::parser::abnf::advance_rulelist;

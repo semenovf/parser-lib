@@ -9,10 +9,11 @@
 #pragma once
 #include "../line_counter_iterator.hpp"
 #include <map>
+#include <memory>
 #include <stack>
+#include <string>
 #include <vector>
 #include <cassert>
-#include <memory>
 
 namespace pfs {
 namespace parser {
@@ -24,7 +25,7 @@ namespace abnf {
 #   define PFS_SYNTAX_TREE_TRACE(x)
 #endif
 
-// NOTE Below #if statement is borrowed from 'abseil-cpp' project. 
+// NOTE Below #if statement is borrowed from 'abseil-cpp' project.
 // Gcc 4.8 has __cplusplus at 201301 but the libstdc++ shipped with it doesn't
 // define make_unique.  Other supported compilers either just define __cplusplus
 // as 201103 but have make_unique (msvc), or have make_unique whenever
@@ -34,7 +35,7 @@ namespace abnf {
 
 using std::make_unique;
 
-#else    
+#else
 
 // Naive implementation of pre-C++14 std::make_unique
 template<typename T, typename... Args>
@@ -383,6 +384,13 @@ class syntax_tree_context
 private:
     rulelist_node_type * _rulelist {nullptr};
     std::stack<std::unique_ptr<basic_node>> _stack;
+    std::map<string_type, rule_node_type *> _rules;
+
+    struct error_spec {
+        std::error_code ec;
+        int lineno = 0;
+        string_type what;
+    } _error_spec;
 
 #if PFS_SYNTAX_TREE_TRACE_ENABLE
     int _indent_level = 0;
@@ -431,26 +439,26 @@ private:
         return static_cast<repetition_node_type *>(& *node);
     }
 
-    inline void end_aggregate_component (bool success)
+    inline basic_node * end_aggregate_component (bool success)
     {
         assert(!_stack.empty());
 
+        basic_node * result {nullptr};
         auto item = std::move(_stack.top());
         _stack.pop();
 
         if (success) {
             auto cn = check_aggregate_node();
+            result = & *item;
             cn->push_back(std::move(item));
         }
+
+        return result;
     }
 
 public:
     syntax_tree_context ()
-    {
-        auto rulelist = make_unique<rulelist_node_type>();
-        _rulelist = & *rulelist;
-        _stack.push(std::move(rulelist));
-    }
+    {}
 
     size_t rules_count () const
     {
@@ -458,20 +466,44 @@ public:
         return _rulelist->size();
     }
 
-    // LCOV_EXCL_START
-    void error (std::error_code ec)
+    // xLCOV_EXCL_START
+    void error (std::error_code ec, forward_iterator near_pos)
     {
-        std::cerr << "Parse error: " << ec.message() << std::endl;
+        _error_spec.ec = ec;
+        _error_spec.lineno = near_pos.lineno();
     }
-    // LCOV_EXCL_STOP
+
+    void syntax_error (std::error_code ec
+        , forward_iterator near_pos
+        , string_type const & what)
+    {
+        _error_spec.ec = ec;
+        _error_spec.lineno = near_pos.lineno();
+        _error_spec.what = what;
+    }
+    // xLCOV_EXCL_STOP
 
     size_t max_quoted_string_length ()
     {
         return 0;
     }
 
+    bool begin_document ()
+    {
+        auto rulelist = make_unique<rulelist_node_type>();
+        _rulelist = & *rulelist;
+        _stack.push(std::move(rulelist));
+        return true;
+    }
+
+    bool end_document (bool success)
+    {
+        assert(_stack.size() == 1);
+        return true;
+    }
+
     // ProseContext
-    void prose (forward_iterator first, forward_iterator last)
+    bool prose (forward_iterator first, forward_iterator last)
     {
         auto value = string_type(first.base(), last.base());
 
@@ -482,10 +514,12 @@ public:
         auto cn = check_repetition_node();
         auto prose = make_unique<prose_node_type>(std::move(value));
         cn->set_element(std::move(prose));
+
+        return true;
     }
 
     // NumberContext
-    void first_number (pfs::parser::abnf::number_flag flag
+    bool first_number (pfs::parser::abnf::number_flag flag
         , forward_iterator first
         , forward_iterator last)
     {
@@ -498,9 +532,11 @@ public:
         auto num = make_unique<number_node_type>(flag);
         num->set_first(std::move(value));
         _stack.push(std::move(num));
+
+        return true;
     }
 
-    void last_number (pfs::parser::abnf::number_flag
+    bool last_number (pfs::parser::abnf::number_flag
         , forward_iterator first
         , forward_iterator last)
     {
@@ -525,9 +561,11 @@ public:
 
         auto rep = check_repetition_node();
         rep->set_element(std::move(num));
+
+        return true;
     }
 
-    void next_number (pfs::parser::abnf::number_flag
+    bool next_number (pfs::parser::abnf::number_flag
         , forward_iterator first
         , forward_iterator last)
     {
@@ -539,10 +577,12 @@ public:
 
         auto cn = check_number_node();
         cn->push_next(std::move(value));
+
+        return true;
     }
 
     // QuotedStringContext
-    void quoted_string (forward_iterator first, forward_iterator last)
+    bool quoted_string (forward_iterator first, forward_iterator last)
     {
         auto value = string_type(first.base(), last.base());
 
@@ -553,10 +593,12 @@ public:
         auto cn = check_repetition_node();
         auto qs = make_unique<quoted_string_node_type>(std::move(value));
         cn->set_element(std::move(qs));
+
+        return true;
     }
 
     // GroupContext
-    void begin_group ()
+    bool begin_group ()
     {
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "BEGIN group\n"
@@ -566,9 +608,11 @@ public:
         _stack.push(std::move(gr));
 
         PFS_SYNTAX_TREE_TRACE((++_indent_level));
+
+        return true;
     }
 
-    void end_group (bool success)
+    bool end_group (bool success)
     {
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
@@ -585,10 +629,12 @@ public:
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "END group: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
+
+        return true;
     }
 
     // OptionContext
-    void begin_option ()
+    bool begin_option ()
     {
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "BEGIN option\n"
@@ -598,9 +644,11 @@ public:
         _stack.push(std::move(opt));
 
         PFS_SYNTAX_TREE_TRACE((++_indent_level));
+
+        return true;
     }
 
-    void end_option (bool success)
+    bool end_option (bool success)
     {
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
@@ -617,10 +665,12 @@ public:
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "END option: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
+
+        return true;
     }
 
     // RepeatContext
-    void repeat (long from, long to)
+    bool repeat (long from, long to)
     {
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "repeat: " << from << '-' << to << "\n"
@@ -628,10 +678,12 @@ public:
 
         auto cn = check_repetition_node();
         cn->set_range(from, to);
+
+        return true;
     }
 
     // RulenameContext
-    void rulename (forward_iterator first, forward_iterator last)
+    bool rulename (forward_iterator first, forward_iterator last)
     {
         auto value = string_type(first.base(), last.base());
 
@@ -642,10 +694,12 @@ public:
         auto cn = check_repetition_node();
         auto rn = make_unique<rulename_node_type>(std::move(value));
         cn->set_element(std::move(rn));
+
+        return true;
     }
 
     // RepetitionContext
-    void begin_repetition ()
+    bool begin_repetition ()
     {
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "BEGIN repetition\n"
@@ -655,9 +709,11 @@ public:
         _stack.push(std::move(rep));
 
         PFS_SYNTAX_TREE_TRACE((++_indent_level));
+
+        return true;
     }
 
-    void end_repetition (bool success)
+    bool end_repetition (bool success)
     {
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
@@ -666,10 +722,12 @@ public:
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "END repetition: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
+
+        return true;
     }
 
     // AlternationContext
-    void begin_alternation ()
+    bool begin_alternation ()
     {
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "BEGIN alternation\n"
@@ -679,9 +737,11 @@ public:
         _stack.push(std::move(alt));
 
         PFS_SYNTAX_TREE_TRACE((++_indent_level));
+
+        return true;
     }
 
-    void end_alternation (bool success)
+    bool end_alternation (bool success)
     {
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
@@ -690,10 +750,12 @@ public:
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "END alternation: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
+
+        return true;
     }
 
     // ConcatenationContext
-    void begin_concatenation ()
+    bool begin_concatenation ()
     {
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "BEGIN concatenation\n"
@@ -703,9 +765,11 @@ public:
         _stack.push(std::move(cat));
 
         PFS_SYNTAX_TREE_TRACE((++_indent_level));
+
+        return true;
     }
 
-    void end_concatenation (bool success)
+    bool end_concatenation (bool success)
     {
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
@@ -714,17 +778,27 @@ public:
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "END concatenation: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
+
+        return true;
     }
 
-    void begin_rule (forward_iterator first, forward_iterator last
+    bool begin_rule (forward_iterator first, forward_iterator last
         , bool is_incremental_alternatives)
     {
         auto value = string_type(first.base(), last.base());
+
+        auto rule_it = _rules.find(value);
+        auto rule_it_end = _rules.end();
 
         if (is_incremental_alternatives) {
             PFS_SYNTAX_TREE_TRACE((
                 std::cout << indent() << "BEGIN incremental alternative rule: " << value << "\n"
             ));
+
+            if (rule_it == rule_it_end) {
+                syntax_error(make_error_code(errc::rule_undefined), first, value);
+                return false;
+            }
 
             // FIXME Need to design the technique to add incremental alternatives
         } else {
@@ -732,14 +806,23 @@ public:
                 std::cout << indent() << "BEGIN basic rule definition: " << value << "\n"
             ));
 
+            // Error: rule already exists
+            if (rule_it != rule_it_end) {
+                syntax_error(make_error_code(errc::rulename_duplicated), first, value);
+                return false;
+            }
+
             auto rule = make_unique<rule_node_type>();
+            _rules.emplace(value, & *rule);
             _stack.push(std::move(rule));
         }
 
         PFS_SYNTAX_TREE_TRACE((++_indent_level));
+
+        return true;
     };
 
-    void end_rule (forward_iterator first, forward_iterator last
+    bool end_rule (forward_iterator first, forward_iterator last
         , bool is_incremental_alternatives
         , bool success)
     {
@@ -747,14 +830,25 @@ public:
 
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
-        if (! is_incremental_alternatives) {
-            end_aggregate_component(success);
+        auto rule_it = _rules.find(value);
+        auto rule_it_end = _rules.end();
+
+        if (is_incremental_alternatives) {
+        } else {
+            auto node = end_aggregate_component(success);
+
+            if (success) {
+                assert(node);
+                assert(node->type() == node_enum::rule);
+            }
         }
 
         PFS_SYNTAX_TREE_TRACE((
             std::cout << indent() << "END rule: " << value
                 << ": " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
+
+        return true;
     }
 };
 

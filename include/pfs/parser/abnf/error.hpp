@@ -21,22 +21,15 @@ enum class errc
 {
       success = 0
 
-// Parser errors
-//     , forbidden_root_element
+    // Parser errors
     , unbalanced_quote
     , bad_quoted_char
     , max_length_exceeded
     , bad_repeat_range
-//     , bad_escaped_char
-//     , bad_encoded_char
-//     , unbalanced_array_bracket
-//     , unbalanced_object_bracket
-//     , bad_member_name
-//     , bad_json_sequence
 
-//
-//     , type_error
-//     , null_pointer
+    // Syntax analyzer errors
+    , rule_undefined
+    , rulename_duplicated
 };
 
 class error_category : public std::error_category
@@ -60,6 +53,11 @@ public:
                 return std::string{"maximum string length exceeded"};
             case static_cast<int>(errc::bad_repeat_range):
                 return std::string{"bad repeat range"};
+
+            case static_cast<int>(errc::rule_undefined):
+                return std::string{"rule undefined"};
+            case static_cast<int>(errc::rulename_duplicated):
+                return std::string{"rulename duplicated"};
 
             default: return std::string{"unknown parser error"};
         }

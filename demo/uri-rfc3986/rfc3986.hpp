@@ -26,62 +26,66 @@ public:
         return _lastError;
     }
 
+    bool begin_document () { return true; }
+    bool end_document (bool) { return true; }
+
     // ProseContext
-    void prose (forward_iterator, forward_iterator) {}
+    bool prose (forward_iterator, forward_iterator) { return true; }
 
     // NumberContext
-    void first_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
-    void last_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
-    void next_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) {}
+    bool first_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) { return true; }
+    bool last_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) { return true; }
+    bool next_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) { return true; }
 
     // QuotedStringContext
-    void quoted_string (forward_iterator, forward_iterator) {}
+    bool quoted_string (forward_iterator, forward_iterator) { return true; }
 
-    void error (std::error_code ec)
+    void error (std::error_code ec, forward_iterator near_pos)
     {
         _lastError = ec.message();
+        _lastError += " at ";
+        _lastError += std::to_string(near_pos.lineno());
+        _lastError += " line";
     }
 
     size_t max_quoted_string_length () { return 0; }
 
     // GroupContext
-    void begin_group () {}
-    void end_group (bool success) {}
+    bool begin_group () { return true; }
+    bool end_group (bool success) { return true; }
 
     // OptionContext
-    void begin_option () {}
-    void end_option (bool success) {}
+    bool begin_option () { return true; }
+    bool end_option (bool success) { return true; }
 
     // RepeatContext
-    void repeat (long from, long to) {}
-
-    // CommentContext
-    void comment (forward_iterator first, forward_iterator last) {}
+    bool repeat (long from, long to) { return true; }
 
     // RulenameContext
-    void rulename (forward_iterator first, forward_iterator last) {}
+    bool rulename (forward_iterator first, forward_iterator last) { return true; }
 
     // RepetitionContext
-    void begin_repetition () {}
-    void end_repetition (bool success) {}
+    bool begin_repetition () { return true; }
+    bool end_repetition (bool success) { return true; }
 
     // AlternationContext
-    void begin_alternation () {}
-    void end_alternation (bool success) {}
+    bool begin_alternation () { return true; }
+    bool end_alternation (bool success) { return true; }
 
     // ConcatenationContext
-    void begin_concatenation () {}
-    void end_concatenation (bool success) {}
+    bool begin_concatenation () { return true; }
+    bool end_concatenation (bool success) { return true; }
 
     // RuleContext
-    void begin_rule (forward_iterator, forward_iterator
+    bool begin_rule (forward_iterator, forward_iterator
         , bool is_incremental_alternatives)
     {
         if (!is_incremental_alternatives)
             rulenames++;
+        return true;
     }
 
-    void end_rule (forward_iterator, forward_iterator, bool, bool) {}
+    bool end_rule (forward_iterator, forward_iterator, bool, bool) { return true; }
 };
 
 }} // grammar::rfc3986

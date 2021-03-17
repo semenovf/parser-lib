@@ -112,7 +112,7 @@ inline bool is_prose_value_char (CharType ch)
  *
  * @par
  * ProseContext {
- *     void prose (ForwardIterator first, ForwardIterator last)
+ *     bool prose (ForwardIterator first, ForwardIterator last)
  * }
  *
  * @note Grammar
@@ -149,12 +149,14 @@ bool advance_prose (ForwardIterator & pos
     if (*p != char_type('>'))
         return false;
 
+    bool success = true;
+
     if (ctx)
-        ctx->prose(first_pos, p);
+        success = success && ctx->prose(first_pos, p);
 
     ++p;
 
-    return compare_and_assign(pos, p);
+    return success && compare_and_assign(pos, p);
 }
 
 enum class number_flag {
@@ -171,9 +173,9 @@ enum class number_flag {
  *
  * @par
  * NumberContext {
- *     void first_number (number_flag, ForwardIterator first, ForwardIterator last)
- *     void last_number (number_flag, ForwardIterator first, ForwardIterator last)
- *     void next_number (number_flag, ForwardIterator first, ForwardIterator last)
+ *     bool first_number (number_flag, ForwardIterator first, ForwardIterator last)
+ *     bool last_number (number_flag, ForwardIterator first, ForwardIterator last)
+ *     bool next_number (number_flag, ForwardIterator first, ForwardIterator last)
  * }
  *
  * @note Grammar
@@ -189,6 +191,7 @@ bool advance_number (ForwardIterator & pos
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
+    bool success = true;
     auto p = pos;
 
     if (p == last)
@@ -233,7 +236,7 @@ bool advance_number (ForwardIterator & pos
         return false;
 
     if (ctx)
-        ctx->first_number(flag, first_pos, p);
+        success = success && ctx->first_number(flag, first_pos, p);
 
     if (p != last) {
         if (*p == char_type('-')) {
@@ -249,7 +252,8 @@ bool advance_number (ForwardIterator & pos
                 return false;
 
             if (ctx)
-                ctx->last_number(flag, first_pos, p);
+                success = success && ctx->last_number(flag, first_pos, p);
+
         } else if (*p == char_type('.')) {
             while (*p == char_type('.')) {
                 ++p;
@@ -264,22 +268,22 @@ bool advance_number (ForwardIterator & pos
                     return false;
 
                 if (ctx)
-                    ctx->next_number(flag, first_pos, p);
+                    success = success && ctx->next_number(flag, first_pos, p);
             }
 
             // Notify observer no more valid elements parsed
             if (ctx)
-                ctx->last_number(flag, p, p);
+                success = success && ctx->last_number(flag, p, p);
         } else {
             if (ctx)
-                ctx->last_number(flag, p, p);
+                success = success && ctx->last_number(flag, p, p);
         }
     } else {
         if (ctx)
-            ctx->last_number(flag, p, p);
+            success = success && ctx->last_number(flag, p, p);
     }
 
-    return compare_and_assign(pos, p);
+    return success && compare_and_assign(pos, p);
 }
 
 /**
@@ -296,8 +300,8 @@ bool advance_number (ForwardIterator & pos
  * @par
  * QuotedStringContext {
  *     size_t max_quoted_string_length ()
- *     void quoted_string (ForwardIterator first, ForwardIterator last)
- *     void error (error_code ec);
+ *     bool quoted_string (ForwardIterator first, ForwardIterator last)
+ *     void error (error_code ec, ForwardIterator near_pos);
  * }
  *
  * @note Grammar
@@ -312,6 +316,7 @@ bool advance_quoted_string (ForwardIterator & pos
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
+    bool success = true;
     auto p = pos;
 
     if (p == last)
@@ -327,7 +332,7 @@ bool advance_quoted_string (ForwardIterator & pos
     if (p == last) {
         if (ctx) {
             auto ec = make_error_code(errc::unbalanced_quote);
-            ctx->error(ec);
+            ctx->error(ec, first_pos);
         }
         return false;
     }
@@ -345,7 +350,7 @@ bool advance_quoted_string (ForwardIterator & pos
         if (!(is_visible_char(*p) || is_space_char(*p))) {
             if (ctx) {
                 auto ec = make_error_code(errc::bad_quoted_char);
-                ctx->error(ec);
+                ctx->error(ec, p);
             }
 
             return false;
@@ -354,7 +359,7 @@ bool advance_quoted_string (ForwardIterator & pos
         if (length == max_length) {
             if (ctx) {
                 auto ec = make_error_code(errc::max_length_exceeded);
-                ctx->error(ec);
+                ctx->error(ec, first_pos);
             }
             return false;
         }
@@ -366,18 +371,18 @@ bool advance_quoted_string (ForwardIterator & pos
     if (p == last) {
         if (ctx) {
             auto ec = make_error_code(errc::unbalanced_quote);
-            ctx->error(ec);
+            ctx->error(ec, first_pos);
         }
         return false;
     }
 
     if (ctx) {
-        ctx->quoted_string(first_pos, p);
+        success = success && ctx->quoted_string(first_pos, p);
     }
 
     ++p; // Skip DQUOTE
 
-    return compare_and_assign(pos, p);
+    return success && compare_and_assign(pos, p);
 }
 
 /**
@@ -390,8 +395,8 @@ bool advance_quoted_string (ForwardIterator & pos
  *
  * @par
  * RepeatContext {
- *     void repeat (long from, long to)
- *     void error (error_code ec)
+ *     bool repeat (long from, long to)
+ *     void error (error_code ec, ForwardIterator near_pos)
  * }
  *
  * if first_from == last_from -> no low limit (*1)
@@ -408,6 +413,7 @@ bool advance_repeat (ForwardIterator & pos
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
+    bool success = true;
     auto p = pos;
 
     if (p == last)
@@ -452,12 +458,12 @@ bool advance_repeat (ForwardIterator & pos
         auto to = to_decimal_number(first_to, last_to);
 
         if (!from.second) {
-            ctx->error(make_error_code(pfs::parser::errc::bad_repeat_range));
+            ctx->error(make_error_code(pfs::parser::errc::bad_repeat_range), first_from);
             return false;
         }
 
         if (!to.second) {
-            ctx->error(make_error_code(pfs::parser::errc::bad_repeat_range));
+            ctx->error(make_error_code(pfs::parser::errc::bad_repeat_range), first_to);
             return false;
         }
 
@@ -465,14 +471,14 @@ bool advance_repeat (ForwardIterator & pos
             to.first = std::numeric_limits<long>::max();
 
         if (from.first > to.first) {
-            ctx->error(make_error_code(pfs::parser::errc::bad_repeat_range));
+            ctx->error(make_error_code(pfs::parser::errc::bad_repeat_range), first_from);
             return false;
         }
 
-        ctx->repeat(from.first, to.first);
+        success = success && ctx->repeat(from.first, to.first);
     }
 
-    return compare_and_assign(pos, p);
+    return success && compare_and_assign(pos, p);
 }
 
 /**
@@ -621,7 +627,7 @@ bool advance_rulename_helper (ForwardIterator & pos
  *
  * @par
  * RulenameContext {
- *     void rulename (ForwardIterator first, ForwardIterator last)
+ *     bool rulename (ForwardIterator first, ForwardIterator last)
  * }
  *
  * @note Grammar
@@ -634,6 +640,8 @@ bool advance_rulename (ForwardIterator & pos
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
+    bool success = true;
+
     if (pos == last)
         return false;
 
@@ -644,9 +652,9 @@ bool advance_rulename (ForwardIterator & pos
         return false;
 
     if (ctx)
-        ctx->rulename(rulename_first, rulename_last);
+        success = success && ctx->rulename(rulename_first, rulename_last);
 
-    return true;
+    return success;
 }
 
 // Forward decalration for advance_group() and advance_option()
@@ -709,8 +717,8 @@ bool advance_element (ForwardIterator & pos
  * RepetitionContext extends RepeatContext
  *      , ElementContext
  * {
- *      void begin_repetition ()
- *      void end_repetition (bool success)
+ *      bool begin_repetition ()
+ *      bool end_repetition (bool success)
  * }
  *
  * @note Grammar
@@ -721,18 +729,20 @@ bool advance_repetition (ForwardIterator & pos
     , ForwardIterator last
     , RepetitionContext * ctx = nullptr)
 {
+    bool success = true;
+
     if (pos == last)
         return false;
 
     if (ctx)
-        ctx->begin_repetition();
+        success = success && ctx->begin_repetition();
 
     advance_repeat(pos, last, ctx);
 
-    auto success = advance_element(pos, last, ctx);
+    success = success && advance_element(pos, last, ctx);
 
     if (ctx)
-        ctx->end_repetition(success);
+        success = success && ctx->end_repetition(success);
 
     return success;
 }
@@ -749,8 +759,8 @@ bool advance_repetition (ForwardIterator & pos
  * ConcatenationContext extends RepetitionContext
  *      , CommentContext
  * {
- *      void begin_concatenation ()
- *      void end_concatenation (bool success)
+ *      bool begin_concatenation ()
+ *      bool end_concatenation (bool success)
  * }
  *
  * @note Grammar
@@ -761,14 +771,16 @@ bool advance_concatenation (ForwardIterator & pos
     , ForwardIterator last
     , ConcatenationContext * ctx = nullptr)
 {
+    bool success = true;
+
     if (pos == last)
         return false;
 
     if (ctx)
-        ctx->begin_concatenation();
+        success = success && ctx->begin_concatenation();
 
     // At least one repetition need
-    auto success = advance_repetition(pos, last, ctx);
+    success = success && advance_repetition(pos, last, ctx);
 
     // *(1*c-wsp repetition)
     success = success && advance_repetition_by_range(pos, last, unlimited_range()
@@ -791,7 +803,7 @@ bool advance_concatenation (ForwardIterator & pos
         });
 
     if (ctx)
-        ctx->end_concatenation(success);
+        success = success && ctx->end_concatenation(success);
 
     return success;
 }
@@ -807,8 +819,8 @@ bool advance_concatenation (ForwardIterator & pos
  * @par
  * AlternationContext extends ConcatenationContext
  * {
- *      void begin_alternation ()
- *      void end_alternation ()
+ *      bool begin_alternation ()
+ *      bool end_alternation ()
  * }
  *
  * @note Grammar
@@ -821,13 +833,15 @@ bool advance_alternation (ForwardIterator & pos
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
+    bool success = true;
+
     if (pos == last)
         return false;
 
     if (ctx)
-        ctx->begin_alternation();
+        success = success && ctx->begin_alternation();
 
-    auto success = advance_concatenation(pos, last, ctx);
+    success = success && advance_concatenation(pos, last, ctx);
 
     // _________________________________________________
     // |                                               |
@@ -862,7 +876,7 @@ bool advance_alternation (ForwardIterator & pos
         });
 
     if (ctx)
-        ctx->end_alternation(success);
+        success = success && ctx->end_alternation(success);
 
     return success;
 }
@@ -943,6 +957,8 @@ bool advance_group (ForwardIterator & pos
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
+    bool success = true;
+
     if (pos == last)
         return false;
 
@@ -952,12 +968,12 @@ bool advance_group (ForwardIterator & pos
         return false;
 
     if (ctx)
-        ctx->begin_group();
+        success = success && ctx->begin_group();
 
-    auto success = advance_group_or_option(pos, last, ctx);
+    success = success && advance_group_or_option(pos, last, ctx);
 
     if (ctx)
-        ctx->end_group(success);
+        success = success && ctx->end_group(success);
 
     return success;
 }
@@ -973,8 +989,8 @@ bool advance_group (ForwardIterator & pos
  * @par
  * OptionContext extends AlternationContext
  * {
- *      void begin_option ()
- *      void end_option (bool success)
+ *      bool begin_option ()
+ *      bool end_option (bool success)
  * }
  *
  * @note Grammar
@@ -987,6 +1003,8 @@ bool advance_option (ForwardIterator & pos
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
+    bool success = true;
+
     if (pos == last)
         return false;
 
@@ -996,12 +1014,12 @@ bool advance_option (ForwardIterator & pos
         return false;
 
     if (ctx)
-        ctx->begin_option();
+        success = success && ctx->begin_option();
 
-    auto success = advance_group_or_option(pos, last, ctx);
+    success = success && advance_group_or_option(pos, last, ctx);
 
     if (ctx)
-        ctx->end_option(success);
+        success = success && ctx->end_option(success);
 
     return success;
 }
@@ -1106,10 +1124,10 @@ bool advance_elements (ForwardIterator & pos
  *      , DefinedAsContext
  *      , CommentContext
  * {
- *      void begin_rule (ForwardIterator rulename_first
+ *      bool begin_rule (ForwardIterator rulename_first
  *          , ForwardIterator rulename_last
  *          , bool is_incremental_alternatives);
- *      void end_rule (ForwardIterator rulename_first
+ *      bool end_rule (ForwardIterator rulename_first
  *          , ForwardIterator rulename_last
  *          , is_incremental_alternatives
  *          , bool success);
@@ -1125,6 +1143,7 @@ bool advance_rule (ForwardIterator & pos
     , ForwardIterator last
     , RuleContext * ctx = nullptr)
 {
+    bool success = true;
     auto p = pos;
 
     if (pos == last)
@@ -1142,9 +1161,9 @@ bool advance_rule (ForwardIterator & pos
         return false;
 
     if (ctx)
-        ctx->begin_rule(rulename_first, rulename_last, is_incremental_alternatives);
+        success = success && ctx->begin_rule(rulename_first, rulename_last, is_incremental_alternatives);
 
-    auto success = advance_elements(p, last, ctx);
+    success = success && advance_elements(p, last, ctx);
 
     if (p != last) {
         success = success && advance_comment_newline(p, last);
@@ -1154,7 +1173,7 @@ bool advance_rule (ForwardIterator & pos
         ;
 
     if (ctx) {
-        ctx->end_rule(rulename_first, rulename_last
+        success = success && ctx->end_rule(rulename_first, rulename_last
             , is_incremental_alternatives
             , success);
     }
@@ -1173,7 +1192,10 @@ bool advance_rule (ForwardIterator & pos
  * @par
  * RulelistContext extends RuleContext
  *      , CommentContext
- * {}
+ * {
+ *      bool begin_document ()
+ *      bool end_document (bool success)
+ * }
  *
  * @note Grammar
  * rulelist = 1*( rule / (*c-wsp c-nl) )
@@ -1183,7 +1205,12 @@ bool advance_rulelist (ForwardIterator & pos
     , ForwardIterator last
     , RulelistContext * ctx = nullptr)
 {
-    return advance_repetition_by_range(pos, last, make_range(1)
+    bool success = true;
+
+    if (ctx)
+        success = success && ctx->begin_document();
+
+    success = success && advance_repetition_by_range(pos, last, make_range(1)
         , [ctx] (ForwardIterator & pos, ForwardIterator last) -> bool {
 
             auto p = pos;
@@ -1203,6 +1230,11 @@ bool advance_rulelist (ForwardIterator & pos
 
             return compare_and_assign(pos, p);
         });
+
+    if (ctx)
+        success = success && ctx->end_document(success);
+
+    return success;
 }
 
 }}} // // namespace pfs::parser::abnf
