@@ -12,10 +12,7 @@
 #include <stack>
 #include <vector>
 #include <cassert>
-
-#if __cplusplus < 201402L // before C++14
 #include <memory>
-#endif
 
 namespace pfs {
 namespace parser {
@@ -27,15 +24,26 @@ namespace abnf {
 #   define PFS_SYNTAX_TREE_TRACE(x)
 #endif
 
-#if __cplusplus < 201402L // before C++14
+// NOTE Below #if statement is borrowed from 'abseil-cpp' project. 
+// Gcc 4.8 has __cplusplus at 201301 but the libstdc++ shipped with it doesn't
+// define make_unique.  Other supported compilers either just define __cplusplus
+// as 201103 but have make_unique (msvc), or have make_unique whenever
+// __cplusplus > 201103 (clang).
+#if (__cplusplus > 201103L || defined(_MSC_VER)) && \
+    !(defined(__GLIBCXX__) && !defined(__cpp_lib_make_unique))
+
+using std::make_unique;
+
+#else    
+
+// Naive implementation of pre-C++14 std::make_unique
 template<typename T, typename... Args>
 std::unique_ptr<T> make_unique(Args &&... args)
 {
     static_assert(!std::is_array<T>::value, "arrays not supported");
     return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
-#else
-    using std::make_unique;
+
 #endif
 
 enum class node_enum
