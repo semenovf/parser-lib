@@ -8,11 +8,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "../line_counter_iterator.hpp"
+#include "node.hpp"
 #include <map>
 #include <memory>
 #include <stack>
 #include <string>
-#include <vector>
 #include <cassert>
 
 namespace pfs {
@@ -47,319 +47,6 @@ std::unique_ptr<T> make_unique(Args &&... args)
 
 #endif
 
-enum class node_enum
-{
-      unknown
-    , prose
-    , number
-    , quoted_string
-    , rulename
-    , repetition
-    , group
-    , option
-    , concatenation
-    , alternation
-    , rule
-    , rulelist
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// node
-////////////////////////////////////////////////////////////////////////////////
-class basic_node
-{
-    node_enum _type {node_enum::unknown};
-
-public:
-    basic_node (node_enum type) : _type(type) {}
-
-    node_enum type () const noexcept
-    {
-        return _type;
-    }
-
-    bool is_aggregate_node () const noexcept
-    {
-        return _type == node_enum::rule
-            || _type == node_enum::group
-            || _type == node_enum::option
-            || _type == node_enum::concatenation
-            || _type == node_enum::alternation
-            || _type == node_enum::rulelist;
-    }
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// string_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class string_node : public basic_node
-{
-protected:
-    StringType _text;
-
-protected:
-    string_node (node_enum type, StringType && text)
-        : basic_node(type)
-        , _text(std::forward<StringType>(text))
-    {}
-
-public:
-    string_node (string_node const &) = delete;
-    string_node & operator = (string_node const &) = delete;
-
-    string_node (string_node && other)
-        : basic_node(node_enum::prose)
-        , _text(std::forward<StringType>(other._text))
-    {}
-
-    string_node & operator = (string_node && other) = delete;
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// prose_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class prose_node : public string_node<StringType>
-{
-    using base_class = string_node<StringType>;
-
-public:
-    prose_node (StringType && text)
-        : base_class(node_enum::prose, std::forward<StringType>(text))
-    {}
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// number_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class number_node : public basic_node
-{
-    using base_class = basic_node;
-
-    number_flag _flag {number_flag::unspecified};
-    bool _is_range {false};
-    std::vector<StringType> _value;
-
-public:
-    number_node (number_flag flag)
-        : base_class(node_enum::number)
-        , _flag(flag)
-    {}
-
-    // Set first in a range or a sequence
-    void set_first (StringType && text)
-    {
-        assert(_value.size() == 0);
-        _value.push_back(std::forward<StringType>(text));
-    }
-
-    // Set last in a range
-    void set_last (StringType && text)
-    {
-        assert(_value.size() == 1);
-        _is_range = true;
-        _value.push_back(std::forward<StringType>(text));
-    }
-
-    void push_next (StringType && text)
-    {
-        assert(_value.size() > 0);
-        assert(_is_range != true);
-        _value.push_back(std::forward<StringType>(text));
-    }
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// quoted_string_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class quoted_string_node : public string_node<StringType>
-{
-    using base_class = string_node<StringType>;
-
-public:
-    quoted_string_node (StringType && text)
-        : base_class(node_enum::quoted_string, std::forward<StringType>(text))
-    {}
-};
-
-
-////////////////////////////////////////////////////////////////////////////////
-// rulename_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class rulename_node : public string_node<StringType>
-{
-    using base_class = string_node<StringType>;
-
-public:
-    rulename_node (StringType && text)
-        : base_class(node_enum::rulename, std::forward<StringType>(text))
-    {}
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// repetition_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class repetition_node : public basic_node
-{
-    using base_class = basic_node;
-
-    long _from {1};
-    long _to {1};
-    std::unique_ptr<basic_node> _element;
-
-public:
-    repetition_node ()
-        : base_class(node_enum::repetition)
-        , _from(1)
-        , _to(1)
-    {}
-
-    void set_range (long from, long to)
-    {
-        _from = from;
-        _to = to;
-    }
-
-    void set_element (std::unique_ptr<basic_node> && elem)
-    {
-        _element = std::move(elem);
-    }
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// aggregate_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class aggregate_node : public basic_node
-{
-    using base_class = basic_node;
-    using item_type = std::unique_ptr<basic_node>;
-    using size_type = typename std::vector<item_type>::size_type;
-
-protected:
-    std::vector<item_type> _siblings;
-
-protected:
-    aggregate_node (node_enum type)
-        : base_class(type)
-    {}
-
-public:
-    size_type size () const
-    {
-        return _siblings.size();
-    }
-
-    void push_back (item_type && item)
-    {
-        _siblings.push_back(std::forward<item_type>(item));
-    }
-
-    template <typename Visitor>
-    void visit (Visitor && vis)
-    {
-        for (auto & item: _siblings) {
-            vis(item);
-        }
-    }
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// rule_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class rule_node : public aggregate_node<StringType>
-{
-    using base_class = aggregate_node<StringType>;
-
-    StringType _name;
-
-public:
-    rule_node ()
-        : base_class(node_enum::rule)
-    {}
-
-    void set_name (StringType && name)
-    {
-        _name = std::forward<StringType>(name);
-    }
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// group_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class group_node : public aggregate_node<StringType>
-{
-    using base_class = aggregate_node<StringType>;
-
-public:
-    group_node ()
-        : base_class(node_enum::group)
-    {}
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// option_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class option_node : public aggregate_node<StringType>
-{
-    using base_class = aggregate_node<StringType>;
-
-public:
-    option_node ()
-        : base_class(node_enum::option)
-    {}
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// concatenation_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class concatenation_node : public aggregate_node<StringType>
-{
-    using base_class = aggregate_node<StringType>;
-
-public:
-    concatenation_node ()
-        : base_class(node_enum::concatenation)
-    {}
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// alternation_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class alternation_node : public aggregate_node<StringType>
-{
-    using base_class = aggregate_node<StringType>;
-
-public:
-    alternation_node ()
-        : base_class(node_enum::alternation)
-    {}
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// rulelist_node
-////////////////////////////////////////////////////////////////////////////////
-template <typename StringType>
-class rulelist_node : public aggregate_node<StringType>
-{
-    using base_class = aggregate_node<StringType>;
-
-public:
-    rulelist_node ()
-        : base_class(node_enum::rulelist)
-    {}
-};
-
 ////////////////////////////////////////////////////////////////////////////////
 // syntax_tree_cotext
 ////////////////////////////////////////////////////////////////////////////////
@@ -372,19 +59,18 @@ class syntax_tree_context
     using number_node_type = number_node<string_type>;
     using quoted_string_node_type = quoted_string_node<string_type>;
     using rulename_node_type = rulename_node<string_type>;
-    using repetition_node_type = repetition_node<string_type>;
-    using group_node_type = group_node<string_type>;
-    using option_node_type = option_node<string_type>;
-    using concatenation_node_type = concatenation_node<string_type>;
-    using alternation_node_type = alternation_node<string_type>;
+    using repetition_node_type = repetition_node;
+    using group_node_type = group_node;
+    using option_node_type = option_node;
+    using concatenation_node_type = concatenation_node;
+    using alternation_node_type = alternation_node;
     using rule_node_type = rule_node<string_type>;
     using rulelist_node_type = rulelist_node<string_type>;
-    using aggregate_node_type = aggregate_node<string_type>;
+    using aggregate_node_type = aggregate_node;
 
 private:
     rulelist_node_type * _rulelist {nullptr};
     std::stack<std::unique_ptr<basic_node>> _stack;
-    std::map<string_type, rule_node_type *> _rules;
 
     struct error_spec {
         std::error_code ec;
@@ -437,6 +123,14 @@ private:
         auto & node = _stack.top();
         assert(node->type() == node_enum::repetition);
         return static_cast<repetition_node_type *>(& *node);
+    }
+
+    inline rulelist_node_type * check_rulelist_node ()
+    {
+        assert(!_stack.empty());
+        auto & node = _stack.top();
+        assert(node->type() == node_enum::rulelist);
+        return static_cast<rulelist_node_type *>(& *node);
     }
 
     inline basic_node * end_aggregate_component (bool success)
@@ -519,7 +213,7 @@ public:
     }
 
     // NumberContext
-    bool first_number (pfs::parser::abnf::number_flag flag
+    bool first_number (number_flag flag
         , forward_iterator first
         , forward_iterator last)
     {
@@ -536,7 +230,7 @@ public:
         return true;
     }
 
-    bool last_number (pfs::parser::abnf::number_flag
+    bool last_number (number_flag
         , forward_iterator first
         , forward_iterator last)
     {
@@ -565,7 +259,7 @@ public:
         return true;
     }
 
-    bool next_number (pfs::parser::abnf::number_flag
+    bool next_number (number_flag
         , forward_iterator first
         , forward_iterator last)
     {
@@ -787,33 +481,33 @@ public:
     {
         auto value = string_type(first.base(), last.base());
 
-        auto rule_it = _rules.find(value);
-        auto rule_it_end = _rules.end();
+        auto cn = check_rulelist_node();
+        auto extracted = cn->extract(value);
 
         if (is_incremental_alternatives) {
             PFS_SYNTAX_TREE_TRACE((
                 std::cout << indent() << "BEGIN incremental alternative rule: " << value << "\n"
             ));
 
-            if (rule_it == rule_it_end) {
+            // Error: rule not found
+            if (extracted.first == false) {
                 syntax_error(make_error_code(errc::rule_undefined), first, value);
                 return false;
             }
 
-            // FIXME Need to design the technique to add incremental alternatives
+            _stack.push(std::move(extracted.second));
         } else {
             PFS_SYNTAX_TREE_TRACE((
                 std::cout << indent() << "BEGIN basic rule definition: " << value << "\n"
             ));
 
             // Error: rule already exists
-            if (rule_it != rule_it_end) {
+            if (extracted.first == true) {
                 syntax_error(make_error_code(errc::rulename_duplicated), first, value);
                 return false;
             }
 
             auto rule = make_unique<rule_node_type>();
-            _rules.emplace(value, & *rule);
             _stack.push(std::move(rule));
         }
 
@@ -830,17 +524,16 @@ public:
 
         PFS_SYNTAX_TREE_TRACE((--_indent_level));
 
-        auto rule_it = _rules.find(value);
-        auto rule_it_end = _rules.end();
+        assert(!_stack.empty());
 
-        if (is_incremental_alternatives) {
-        } else {
-            auto node = end_aggregate_component(success);
+        auto node = std::move(_stack.top());
+        _stack.pop();
 
-            if (success) {
-                assert(node);
-                assert(node->type() == node_enum::rule);
-            }
+        assert(node->type() == node_enum::rule);
+
+        if (success) {
+            auto cn = check_rulelist_node();
+            cn->emplace(std::move(value), std::move(node));
         }
 
         PFS_SYNTAX_TREE_TRACE((

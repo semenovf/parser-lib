@@ -61,8 +61,9 @@ TEST_CASE("Syntax Tree") {
 
         if (!result || first != last) {
             // LCOV_EXCL_START
-            std::cerr << "ERROR: advance_rulelist failed at " << first.lineno()
-                << " line" << std::endl;
+            std::cerr << "ERROR: advance_rulelist failed at line "
+                << first.lineno()
+                << std::endl;
             // LCOV_EXCL_STOP
         }
 
