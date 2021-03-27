@@ -8,6 +8,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "../line_counter_iterator.hpp"
+#include "parser.hpp"
 #include "node.hpp"
 #include <map>
 #include <memory>
@@ -50,11 +51,14 @@ std::unique_ptr<T> make_unique(Args &&... args)
 ////////////////////////////////////////////////////////////////////////////////
 // syntax_tree_cotext
 ////////////////////////////////////////////////////////////////////////////////
-template <typename ForwardIterator, typename StringType>
-class syntax_tree_context
+template <typename StringType, typename ForwardIterator>
+class syntax_tree
 {
-    using forward_iterator = line_counter_iterator<ForwardIterator>;
+public:
     using string_type = StringType;
+    using forward_iterator = line_counter_iterator<ForwardIterator>;
+
+private:
     using prose_node_type = prose_node<string_type>;
     using number_node_type = number_node<string_type>;
     using quoted_string_node_type = quoted_string_node<string_type>;
@@ -69,13 +73,15 @@ class syntax_tree_context
     using aggregate_node_type = aggregate_node;
 
 private:
+    size_t _max_quoted_string_length = 0;
     rulelist_node_type * _rulelist {nullptr};
     std::stack<std::unique_ptr<basic_node>> _stack;
 
-    struct error_spec {
+    struct /*error_spec*/
+    {
         std::error_code ec;
         int lineno = 0;
-        string_type what;
+        StringType what;
     } _error_spec;
 
 #if PFS_SYNTAX_TREE_TRACE_ENABLE
@@ -100,7 +106,7 @@ private:
     }
 #endif
 
-private:
+private: // Helper methods
     inline aggregate_node_type * check_aggregate_node ()
     {
         assert(!_stack.empty());
@@ -151,8 +157,27 @@ private:
     }
 
 public:
-    syntax_tree_context ()
+    syntax_tree (size_t max_quoted_string_length = 0)
+        : _max_quoted_string_length(max_quoted_string_length)
     {}
+
+    syntax_tree (syntax_tree && other) = default;
+    syntax_tree & operator = (syntax_tree && other) = default;
+
+    std::error_code error_code () const
+    {
+        return _error_spec.ec;
+    }
+
+    int error_line () const
+    {
+        return _error_spec.lineno;
+    }
+
+    string_type error_text () const
+    {
+        return _error_spec.what;
+    }
 
     size_t rules_count () const
     {
@@ -160,6 +185,7 @@ public:
         return _rulelist->size();
     }
 
+public: // Parse context requiremenets
     // xLCOV_EXCL_START
     void error (std::error_code ec, forward_iterator near_pos)
     {
@@ -179,7 +205,7 @@ public:
 
     size_t max_quoted_string_length ()
     {
-        return 0;
+        return _max_quoted_string_length;
     }
 
     bool begin_document ()
@@ -545,27 +571,27 @@ public:
     }
 };
 
+template <typename StringType, typename ForwardIterator>
+inline syntax_tree<StringType, ForwardIterator> parse (
+      ForwardIterator & first
+    , ForwardIterator last)
+{
+    using context_type = syntax_tree<StringType, ForwardIterator>;
+    using forward_iterator = typename context_type::forward_iterator;
+    forward_iterator f(first);
+    forward_iterator l(last);
+    context_type ctx;
 
-////////////////////////////////////////////////////////////////////////////////
-// syntax_tree
-////////////////////////////////////////////////////////////////////////////////
+    advance_rulelist(f, l, ctx);
+    first = f.base();
+    return std::move(ctx);
+}
 
-// template <typename StringType>
-// class syntax_tree final
-// {
-//     using rule_spec_type = rule_spec<StringType>;
-//
-//     std::vector<rule_spec_type> _rules;
-//
-// public:
-//     syntax_tree () = default;
-//     ~syntax_tree () = default;
-//
-//     syntax_tree (syntax_tree const & other) = delete;
-//     syntax_tree & operator = (syntax_tree const & other) = delete;
-//
-//     syntax_tree (syntax_tree && other) = default;
-//     syntax_tree & operator = (syntax_tree && other) = default;
-// };
+template <typename StringType, typename ForwardIterator>
+inline syntax_tree<StringType, ForwardIterator> parse_source (
+    StringType const & source)
+{
+    return parse(source.begin(), source.end());
+}
 
 }}} // pfs::parser::abnf

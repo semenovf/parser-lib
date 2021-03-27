@@ -105,7 +105,7 @@ TEST_CASE("advance_prose") {
         , {'<', ' ', 'x', ' '}
     };
 
-    dummy_prose_context * ctx = nullptr;
+    dummy_prose_context ctx;
 
     for (auto const & item: valid_values) {
         auto pos = item.begin();
@@ -179,7 +179,7 @@ TEST_CASE("advance_number") {
         , {'%', 'x', 'F', '.'}
     };
 
-    dummy_number_context * ctx = nullptr;
+    dummy_number_context ctx;
 
 //     {
 //         std::vector<char> item = {'%', 'b'};
@@ -255,7 +255,7 @@ TEST_CASE("advance_quoted_string") {
     };
 
     {
-        dummy_quoted_string_context * ctx = nullptr;
+        dummy_quoted_string_context ctx;
 
         for (auto const & item: valid_values) {
             auto pos = item.begin();
@@ -273,7 +273,7 @@ TEST_CASE("advance_quoted_string") {
         quoted_string_context ctx;
         std::string s {"\"Hello, World!\""};
         auto pos = s.begin();
-        CHECK(advance_quoted_string(pos, s.end(), & ctx));
+        CHECK(advance_quoted_string(pos, s.end(), ctx));
         CHECK(pos == s.end());
         CHECK(ctx.result_str == std::string{"Hello, World!"});
         CHECK(ctx.result_ec == pfs::parser::make_error_code(pfs::parser::errc::success));
@@ -283,7 +283,7 @@ TEST_CASE("advance_quoted_string") {
         quoted_string_context ctx;
         std::string s {"\"x"};
         auto pos = s.begin();
-        CHECK_FALSE(advance_quoted_string(pos, s.end(), & ctx));
+        CHECK_FALSE(advance_quoted_string(pos, s.end(), ctx));
         CHECK(pos == s.begin());
         CHECK(ctx.result_ec == pfs::parser::make_error_code(pfs::parser::errc::unbalanced_quote));
     }
@@ -292,7 +292,7 @@ TEST_CASE("advance_quoted_string") {
         quoted_string_context ctx;
         std::string s {"\"\x01\""};
         auto pos = s.begin();
-        CHECK_FALSE(advance_quoted_string(pos, s.end(), & ctx));
+        CHECK_FALSE(advance_quoted_string(pos, s.end(), ctx));
         CHECK(pos == s.begin());
         CHECK(ctx.result_ec == pfs::parser::make_error_code(pfs::parser::errc::bad_quoted_char));
     }
@@ -301,7 +301,7 @@ TEST_CASE("advance_quoted_string") {
         quoted_string_context ctx{2};
         std::string s {"\"xyz\""};
         auto pos = s.begin();
-        CHECK_FALSE(advance_quoted_string(pos, s.end(), & ctx));
+        CHECK_FALSE(advance_quoted_string(pos, s.end(), ctx));
         CHECK(pos == s.begin());
         CHECK(ctx.result_ec == pfs::parser::make_error_code(pfs::parser::errc::max_length_exceeded));
     }
@@ -351,7 +351,7 @@ TEST_CASE("advance_repeat") {
     };
 
     {
-        dummy_repeat_context * ctx = nullptr;
+        dummy_repeat_context ctx;
 
         for (auto const & item: valid_values) {
             auto pos = item.begin();
@@ -369,7 +369,7 @@ TEST_CASE("advance_repeat") {
         repeat_context ctx;
         std::string s {"10"};
         auto pos = s.begin();
-        CHECK(advance_repeat(pos, s.end(), & ctx));
+        CHECK(advance_repeat(pos, s.end(), ctx));
         CHECK(pos == s.end());
         CHECK(ctx.from == 10L);
         CHECK(ctx.to == 10L);
@@ -379,7 +379,7 @@ TEST_CASE("advance_repeat") {
         repeat_context ctx;
         std::string s {"10*"};
         auto pos = s.begin();
-        CHECK(advance_repeat(pos, s.end(), & ctx));
+        CHECK(advance_repeat(pos, s.end(), ctx));
         CHECK(pos == s.end());
         CHECK(ctx.from == 10L);
         CHECK(ctx.to == std::numeric_limits<long>::max());
@@ -389,7 +389,7 @@ TEST_CASE("advance_repeat") {
         repeat_context ctx;
         std::string s {"*10"};
         auto pos = s.begin();
-        CHECK(advance_repeat(pos, s.end(), & ctx));
+        CHECK(advance_repeat(pos, s.end(), ctx));
         CHECK(pos == s.end());
         CHECK(ctx.from == 0);
         CHECK(ctx.to == 10L);
@@ -399,7 +399,7 @@ TEST_CASE("advance_repeat") {
         repeat_context ctx;
         std::string s {"*"};
         auto pos = s.begin();
-        CHECK(advance_repeat(pos, s.end(), & ctx));
+        CHECK(advance_repeat(pos, s.end(), ctx));
         CHECK(pos == s.end());
         CHECK(ctx.from == 0);
         CHECK(ctx.to == std::numeric_limits<long>::max());
@@ -409,7 +409,7 @@ TEST_CASE("advance_repeat") {
         repeat_context ctx;
         std::string s {"10*20"};
         auto pos = s.begin();
-        CHECK(advance_repeat(pos, s.end(), & ctx));
+        CHECK(advance_repeat(pos, s.end(), ctx));
         CHECK(pos == s.end());
         CHECK(ctx.from == 10L);
         CHECK(ctx.to == 20L);
@@ -419,7 +419,7 @@ TEST_CASE("advance_repeat") {
         repeat_context ctx;
         std::string s {"*x"};
         auto pos = s.begin();
-        CHECK(advance_repeat(pos, s.end(), & ctx));
+        CHECK(advance_repeat(pos, s.end(), ctx));
         CHECK_FALSE(pos == s.end());
         CHECK(ctx.from == 0);
         CHECK(ctx.to == std::numeric_limits<long>::max());
@@ -588,7 +588,7 @@ TEST_CASE("advance_rulename") {
     };
 
     {
-        dummy_rulename_context * ctx = nullptr;
+        dummy_rulename_context ctx;
 
         for (auto const & item: valid_values) {
             auto pos = item.begin();
@@ -792,7 +792,7 @@ TEST_CASE("advance_element") {
     };
 
     {
-        dummy_element_context * ctx = nullptr;
+        dummy_element_context ctx;
 
         for (auto const & item : valid_values) {
             auto pos = item.begin();
@@ -854,7 +854,7 @@ TEST_CASE("advance_repetition") {
     };
 
     {
-        dummy_repetition_context * ctx = nullptr;
+        dummy_repetition_context ctx;
 
         for (auto const & item : valid_values) {
             auto pos = item.begin();
@@ -888,7 +888,7 @@ TEST_CASE("advance_concatenation") {
         , { true, 4, {'a', ' ', '\t', 'b'} }
     };
 
-    dummy_concatenation_context * ctx = nullptr;
+    dummy_concatenation_context ctx;
 
     for (auto const & item : test_values) {
         auto first = item.data.begin();
@@ -922,7 +922,7 @@ TEST_CASE("advance_alternation") {
         , { true, 5, {'a', ' ', '/', '\t', 'b'} }
     };
 
-    dummy_alternation_context * ctx = nullptr;
+    dummy_alternation_context ctx;
 
     for (auto const & item : test_values) {
         auto first = item.data.begin();
@@ -952,7 +952,7 @@ TEST_CASE("advance_group") {
         , { true , 3, {'(', 'a', ')'} }
     };
 
-    dummy_group_context * ctx = nullptr;
+    dummy_group_context ctx;
 
     for (auto const & item : test_values) {
         auto first = item.data.begin();
@@ -982,7 +982,7 @@ TEST_CASE("advance_group") {
         , { true , 3, {'[', 'a', ']'} }
     };
 
-    dummy_option_context * ctx = nullptr;
+    dummy_option_context ctx;
 
     for (auto const & item : test_values) {
         auto first = item.data.begin();
@@ -1035,7 +1035,7 @@ TEST_CASE("advance_elements") {
                 , ')', ' ', ')'} }
     };
 
-    dummy_elements_context * ctx = nullptr;
+    dummy_elements_context ctx;
 
     for (auto const & item : test_values) {
         auto first = item.data.begin();
@@ -1069,7 +1069,7 @@ TEST_CASE("advance_rule") {
                 , 'n', 't'} }
     };
 
-    dummy_rule_context * ctx = nullptr;
+    dummy_rule_context ctx;
 
     for (auto const & item : test_values) {
         auto first = item.data.begin();
@@ -1110,7 +1110,7 @@ TEST_CASE("advance_rulelist") {
                 , 'n', 't'} }
     };
 
-    dummy_rulelist_context * ctx = nullptr;
+    dummy_rulelist_context ctx;
 
     for (auto const & item : test_values) {
         auto first = item.data.begin();

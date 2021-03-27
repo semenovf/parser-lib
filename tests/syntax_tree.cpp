@@ -9,7 +9,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #define PFS_SYNTAX_TREE_TRACE_ENABLE 1
 #include "doctest.h"
-#include "pfs/parser/abnf/parser.hpp"
 #include "pfs/parser/abnf/syntax_tree.hpp"
 #include "utils/read_file.hpp"
 #include <iterator>
@@ -23,23 +22,21 @@ struct test_item
 };
 
 static std::vector<test_item> data_files {
-//       { "data/wsp.grammar", 1 }
-//     , { "data/prose.grammar", 1 }
-//     , { "data/comment.grammar", 1 }
-    { "data/incremental-alternatives.grammar", 1 }
-//     , { "data/abnf.grammar", 37 }
-//     , { "data/json-rfc4627.grammar", 30 }
-//     , { "data/json-rfc8259.grammar", 30 }
-//     , { "data/uri-rfc3986.grammar", 36 }
-//     , { "data/uri-geo-rfc58070.grammar", 27 }
+      { "data/wsp.grammar", 1 }
+    , { "data/prose.grammar", 1 }
+    , { "data/comment.grammar", 1 }
+    , { "data/incremental-alternatives.grammar", 1 }
+    , { "data/abnf.grammar", 37 }
+    , { "data/json-rfc4627.grammar", 30 }
+    , { "data/json-rfc8259.grammar", 30 }
+    , { "data/uri-rfc3986.grammar", 36 }
+    , { "data/uri-geo-rfc58070.grammar", 27 }
 };
 
 using string_type = std::string;
-using forward_iterator = pfs::parser::line_counter_iterator<string_type::const_iterator>;
+// using forward_iterator = pfs::parser::line_counter_iterator<string_type::const_iterator>;
 
 TEST_CASE("Syntax Tree") {
-    using pfs::parser::abnf::advance_rulelist;
-
     bool result = std::all_of(data_files.cbegin()
             , data_files.cend()
             , [] (test_item const & item) {
@@ -54,24 +51,28 @@ TEST_CASE("Syntax Tree") {
             // LCOV_EXCL_STOP
         }
 
-        pfs::parser::abnf::syntax_tree_context<string_type::const_iterator, string_type> ctx;
-        auto first = forward_iterator(source.begin());
-        auto last  = forward_iterator(source.end());
-        auto result = advance_rulelist(first, last, & ctx);
+        auto first = source.begin();
+        auto last  = source.end();
+        auto result = pfs::parser::abnf::parse<std::string>(first, last);
 
-        if (!result || first != last) {
-            // LCOV_EXCL_START
-            std::cerr << "ERROR: advance_rulelist failed at line "
-                << first.lineno()
-                << std::endl;
-            // LCOV_EXCL_STOP
+        if (result.error_code()) {
+            std::cerr << "ERROR: parse failed at line "
+                << result.error_line()
+                << ": " << result.error_code();
+
+            if (!result.error_text().empty())
+                std::cerr << ": " << result.error_text();
+
+            std::cerr << std::endl;
         }
 
-        CHECK_MESSAGE(result, item.filename);
-        CHECK((first == last));
+        if (first != last)
+            std::cerr << "ERROR: parse is incomplete" << std::endl;
 
-        // TODO Uncomment after implementation complete
-        // CHECK(ctx.rules_count() == item.rulenames);
+
+        CHECK_MESSAGE(!result.error_code(), item.filename);
+        CHECK((first == last));
+        CHECK(result.rules_count() == item.rulenames);
 
         return true;
     });

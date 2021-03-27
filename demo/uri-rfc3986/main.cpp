@@ -29,7 +29,7 @@ int main ()
     context ctx;
     auto first = forward_iterator {source.begin()};
     auto last  = forward_iterator {source.end()};
-    auto result = advance_rulelist(first, last, & ctx);
+    auto result = advance_rulelist(first, last, ctx);
 
     if (!result || first != last) {
         std::cerr << "ERROR: RFC-3986 parsing failed at " << first.lineno()

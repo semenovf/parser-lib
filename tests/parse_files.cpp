@@ -122,7 +122,7 @@ TEST_CASE("Parse files") {
         dummy_context ctx;
         auto first = forward_iterator(source.begin());
         auto last  = forward_iterator(source.end());
-        auto result = advance_rulelist(first, last, & ctx);
+        auto result = advance_rulelist(first, last, ctx);
 
         if (!result || first != last) {
             // LCOV_EXCL_START

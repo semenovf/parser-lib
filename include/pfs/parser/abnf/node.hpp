@@ -348,6 +348,11 @@ public:
         _rules.erase(it);
         return result;
     }
+
+    size_t size () const
+    {
+        return _rules.size();
+    }
 };
 
 }}} // pfs::parser::abnf
