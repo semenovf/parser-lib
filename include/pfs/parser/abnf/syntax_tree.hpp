@@ -61,10 +61,10 @@ struct parse_result
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// syntax_tree_cotext
+// syntax_tree_context
 ////////////////////////////////////////////////////////////////////////////////
 template <typename StringType, typename ForwardIterator>
-class syntax_tree_cotext
+class syntax_tree_context
 {
 public:
     using string_type = StringType;
@@ -164,12 +164,12 @@ private: // Helper methods
     }
 
 public:
-    syntax_tree_cotext (size_t max_quoted_string_length = 0)
+    syntax_tree_context (size_t max_quoted_string_length = 0)
         : _max_quoted_string_length(max_quoted_string_length)
     {}
 
-    syntax_tree_cotext (syntax_tree_cotext && other) = default;
-    syntax_tree_cotext & operator = (syntax_tree_cotext && other) = default;
+    syntax_tree_context (syntax_tree_context && other) = default;
+    syntax_tree_context & operator = (syntax_tree_context && other) = default;
 
     parse_result<string_type> && result ()
     {
@@ -271,10 +271,10 @@ public: // Parse context requiremenets
         if (first != last) {
             cn->set_last(std::move(value));
         } else {
-            cn->push_next(std::move(value));
+            ;
         }
 
-        auto & num = _stack.top();
+        auto num = std::move(_stack.top());
         _stack.pop();
 
         auto rep = check_repetition_node();
@@ -532,6 +532,7 @@ public: // Parse context requiremenets
             }
 
             auto rule = make_unique<rule_node_type>();
+            rule->set_name(std::move(value));
             _stack.push(std::move(rule));
         }
 
@@ -612,6 +613,147 @@ public:
         return _d.root ? _d.root->size() : 0;
     }
 
+private:
+    template <typename Visitor>
+    void traverse_helper (Visitor & vis, basic_node const * n) const
+    {
+        switch (n->type()) {
+            case node_enum::prose: {
+                auto pn = static_cast<prose_node<string_type> const *>(n);
+                vis.prose(pn->text());
+                break;
+            }
+
+            case node_enum::number: {
+                auto nn = static_cast<number_node<string_type> const *>(n);
+
+                if (nn->is_range()) {
+                    auto first = nn->begin();
+                    auto second = ++nn->begin();
+                    vis.number_range(*first, *second);
+                } else {
+                    auto first = nn->begin();
+                    auto last = nn->end();
+
+                    for (; first != last; ++first)
+                        vis.number(*first);
+                }
+                break;
+            }
+
+            case node_enum::quoted_string: {
+                auto qn = static_cast<quoted_string_node<string_type> const *>(n);
+                vis.quoted_string(qn->text());
+                break;
+            }
+
+            case node_enum::rulename: {
+                auto rn = static_cast<rulename_node<string_type> const *>(n);
+                vis.rulename(rn->text());
+                break;
+            }
+
+            case node_enum::repetition: {
+                auto rn = static_cast<repetition_node const *>(n);
+                vis.begin_repetition();
+                traverse_helper(vis, rn->element());
+                vis.end_repetition();
+                break;
+            }
+
+            case node_enum::group: {
+                auto gn = static_cast<group_node const *>(n);
+                vis.begin_group();
+                gn->visit([this, & vis] (basic_node const * n) {
+                    traverse_helper(vis, n);
+                });
+                vis.end_group();
+                break;
+            }
+
+            case node_enum::option: {
+                auto on = static_cast<option_node const *>(n);
+                vis.begin_option();
+                on->visit([this, & vis] (basic_node const * n) {
+                    traverse_helper(vis, n);
+                });
+                vis.end_option();
+                break;
+            }
+
+            case node_enum::concatenation: {
+                auto cn = static_cast<concatenation_node const *>(n);
+                vis.begin_concatenation();
+                cn->visit([this, & vis] (basic_node const * n) {
+                    traverse_helper(vis, n);
+                });
+                vis.end_concatenation();
+                break;
+            }
+
+            case node_enum::alternation: {
+                auto an = static_cast<alternation_node const *>(n);
+                vis.begin_alternation();
+                an->visit([this, & vis] (basic_node const * n) {
+                    traverse_helper(vis, n);
+                });
+                vis.end_alternation();
+                break;
+            }
+
+            case node_enum::rule: {
+                auto rn = static_cast<rule_node<string_type> const *>(n);
+                vis.begin_rule(rn->name());
+                rn->visit([this, & vis] (basic_node const * n) {
+                    traverse_helper(vis, n);
+                });
+                vis.end_rule();
+                break;
+            }
+
+            case node_enum::rulelist: {
+                auto rn = static_cast<rulelist_node<string_type> const *>(n);
+                vis.begin_document();
+                rn->visit([this, & vis] (basic_node const * n) {
+                    traverse_helper(vis, n);
+                });
+                vis.end_document();
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
+
+public:
+    // Visitor requiremenets:
+    //      * void prose (string_type const &)
+    //      * void number_range (string_type const & from, string_type const & to)
+    //      * void number (string_type const &)
+    //      * void quoted_string () (string_type const &)
+    //      * void rulename (string_type const &)
+    //      * void begin_repetition ()
+    //      * void end_repetition ()
+    //      * void begin_group ()
+    //      * void end_group ()
+    //      * void begin_option ()
+    //      * void end_option ()
+    //      * void begin_concatenation ()
+    //      * void end_concatenation ()
+    //      * void begin_alternation ()
+    //      * void end_alternation ()
+    //      * void begin_rule (string_type const &)
+    //      * void end_rule ()
+    //      * void begin_document ()
+    //      * void end_document ()
+    template <typename Visitor>
+    inline void traverse (Visitor && vis) const
+    {
+        basic_node const * n = & *_d.root;
+        traverse_helper(vis, n);
+    }
+
     template <typename S, typename F>
     friend syntax_tree<S> parse (F & first, F last);
 };
@@ -625,7 +767,7 @@ public:
 template <typename StringType, typename ForwardIterator>
 inline syntax_tree<StringType> parse (ForwardIterator & first, ForwardIterator last)
 {
-    using context_type = syntax_tree_cotext<StringType, ForwardIterator>;
+    using context_type = syntax_tree_context<StringType, ForwardIterator>;
     using forward_iterator = typename context_type::forward_iterator;
     forward_iterator f(first);
     forward_iterator l(last);

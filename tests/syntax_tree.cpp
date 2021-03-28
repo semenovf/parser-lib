@@ -7,7 +7,7 @@
 //      2021.02.14 Initial version
 ////////////////////////////////////////////////////////////////////////////////
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#define PFS_SYNTAX_TREE_TRACE_ENABLE 1
+#define PFS_SYNTAX_TREE_TRACE_ENABLE 0
 #include "doctest.h"
 #include "pfs/parser/abnf/syntax_tree.hpp"
 #include "utils/read_file.hpp"
@@ -25,6 +25,7 @@ static std::vector<test_item> data_files {
       { "data/wsp.grammar", 1 }
     , { "data/prose.grammar", 1 }
     , { "data/comment.grammar", 1 }
+    , { "data/number.grammar", 1 }
     , { "data/incremental-alternatives.grammar", 1 }
     , { "data/abnf.grammar", 37 }
     , { "data/json-rfc4627.grammar", 30 }
@@ -35,6 +36,136 @@ static std::vector<test_item> data_files {
 
 using string_type = std::string;
 // using forward_iterator = pfs::parser::line_counter_iterator<string_type::const_iterator>;
+
+struct visitor
+{
+    int _indent_level = 0;
+    int _indent_step = 4;
+
+    string_type indent ()
+    {
+        string_type result {1, '|'};
+        auto i = _indent_level;
+
+        while (i--) {
+            result += string_type(_indent_step, '-');
+
+            if (i > 0)
+                result += string_type(1, '|');
+        }
+
+        return result;
+    }
+
+    void prose (string_type const & text)
+    {
+        std::cout << indent() << "PROSE: \"" << text << "\"" << std::endl;
+    }
+
+    void number_range (string_type const & from, string_type const & to)
+    {
+        std::cout << indent() << "NUMBER RANGE: " << from << " - " << to << std::endl;
+    }
+
+    void number (string_type const & text)
+    {
+        std::cout << indent() << "NUMBER: " << text << std::endl;
+    }
+
+    void quoted_string (string_type const & text)
+    {
+        std::cout << indent() << "QUOTED STRING: \"" << text << "\"" << std::endl;
+    }
+
+    void rulename (string_type const & text)
+    {
+        std::cout << indent() << "RULENAME: \"" << text << "\"" << std::endl;
+    }
+
+    void begin_repetition ()
+    {
+        std::cout << indent() << "BEGIN REPETITION" << std::endl;
+        ++_indent_level;
+    }
+
+    void end_repetition ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END REPETITION" << std::endl;
+    }
+
+    void begin_group ()
+    {
+        std::cout << indent() << "BEGIN GROUP" << std::endl;
+        ++_indent_level;
+    }
+
+    void end_group ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END GROUP" << std::endl;
+    }
+
+    void begin_option ()
+    {
+        std::cout << indent() << "BEGIN OPTION" << std::endl;
+        ++_indent_level;
+    }
+
+    void end_option ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END OPTION" << std::endl;
+    }
+
+    void begin_concatenation ()
+    {
+        std::cout << indent() << "BEGIN CONCATENATION" << std::endl;
+        ++_indent_level;
+    }
+
+    void end_concatenation ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END CONCATENATION" << std::endl;
+    }
+
+    void begin_alternation ()
+    {
+        std::cout << indent() << "BEGIN ALTERNATION" << std::endl;
+        ++_indent_level;
+    }
+
+    void end_alternation ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END ALTERNATION" << std::endl;
+    }
+
+    void begin_rule (string_type const & name)
+    {
+        std::cout << indent() << "BEGIN RULE: \"" << name << "\"" << std::endl;
+        ++_indent_level;
+    }
+
+    void end_rule ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END RULE" << std::endl;
+    }
+
+    void begin_document ()
+    {
+        std::cout << indent() << "BEGIN DOCUMENT" << std::endl;
+        ++_indent_level;
+    }
+
+    void end_document ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END DOCUMENT" << std::endl;
+    }
+};
 
 TEST_CASE("Syntax Tree") {
     bool result = std::all_of(data_files.cbegin()
@@ -53,26 +184,29 @@ TEST_CASE("Syntax Tree") {
 
         auto first = source.begin();
         auto last  = source.end();
-        auto result = pfs::parser::abnf::parse<std::string>(first, last);
+        auto st = pfs::parser::abnf::parse<std::string>(first, last);
 
-        if (result.error_code()) {
+        if (st.error_code()) {
             std::cerr << "ERROR: parse failed at line "
-                << result.error_line()
-                << ": " << result.error_code();
+                << st.error_line()
+                << ": " << st.error_code();
 
-            if (!result.error_text().empty())
-                std::cerr << ": " << result.error_text();
+            if (!st.error_text().empty())
+                std::cerr << ": " << st.error_text();
 
             std::cerr << std::endl;
+        } else {
+            visitor v;
+            st.traverse(std::move(v));
         }
 
         if (first != last)
             std::cerr << "ERROR: parse is incomplete" << std::endl;
 
 
-        CHECK_MESSAGE(!result.error_code(), item.filename);
+        CHECK_MESSAGE(!st.error_code(), item.filename);
         CHECK((first == last));
-        CHECK(result.rules_count() == item.rulenames);
+        CHECK(st.rules_count() == item.rulenames);
 
         return true;
     });

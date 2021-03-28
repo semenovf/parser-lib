@@ -82,6 +82,11 @@ public:
     {}
 
     string_node & operator = (string_node && other) = delete;
+
+    StringType text () const
+    {
+        return _text;
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -137,6 +142,22 @@ public:
         assert(_is_range != true);
         _value.push_back(std::forward<StringType>(text));
     }
+
+    bool is_range () const
+    {
+        return _is_range;
+    }
+
+    typename std::vector<StringType>::const_iterator begin () const
+    {
+        return _value.begin();
+    }
+
+    typename std::vector<StringType>::const_iterator end () const
+    {
+        return _value.end();
+    }
+
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -196,6 +217,11 @@ public:
     {
         _element = std::move(elem);
     }
+
+    basic_node const * element () const
+    {
+        return & *_element;
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -227,10 +253,10 @@ public:
     }
 
     template <typename Visitor>
-    void visit (Visitor && vis)
+    void visit (Visitor && vis) const
     {
         for (auto & item: _siblings) {
-            vis(item);
+            vis(& *item);
         }
     }
 };
@@ -253,6 +279,11 @@ public:
     void set_name (StringType && name)
     {
         _name = std::forward<StringType>(name);
+    }
+
+    StringType name () const
+    {
+        return _name;
     }
 };
 
@@ -352,6 +383,14 @@ public:
     size_t size () const
     {
         return _rules.size();
+    }
+
+    template <typename Visitor>
+    void visit (Visitor && vis) const
+    {
+        for (auto & item: _rules) {
+            vis(& *item.second);
+        }
     }
 };
 
