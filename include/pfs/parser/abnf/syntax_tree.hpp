@@ -49,10 +49,22 @@ std::unique_ptr<T> make_unique(Args &&... args)
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
+// parse_result
+////////////////////////////////////////////////////////////////////////////////
+template <typename StringType>
+struct parse_result
+{
+    std::error_code ec;
+    int lineno = 0;
+    StringType what;
+    std::unique_ptr<rulelist_node<StringType>> root;
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // syntax_tree_cotext
 ////////////////////////////////////////////////////////////////////////////////
 template <typename StringType, typename ForwardIterator>
-class syntax_tree
+class syntax_tree_cotext
 {
 public:
     using string_type = StringType;
@@ -77,12 +89,7 @@ private:
     rulelist_node_type * _rulelist {nullptr};
     std::stack<std::unique_ptr<basic_node>> _stack;
 
-    struct /*error_spec*/
-    {
-        std::error_code ec;
-        int lineno = 0;
-        StringType what;
-    } _error_spec;
+    parse_result<string_type> _parse_result;
 
 #if PFS_SYNTAX_TREE_TRACE_ENABLE
     int _indent_level = 0;
@@ -157,49 +164,33 @@ private: // Helper methods
     }
 
 public:
-    syntax_tree (size_t max_quoted_string_length = 0)
+    syntax_tree_cotext (size_t max_quoted_string_length = 0)
         : _max_quoted_string_length(max_quoted_string_length)
     {}
 
-    syntax_tree (syntax_tree && other) = default;
-    syntax_tree & operator = (syntax_tree && other) = default;
+    syntax_tree_cotext (syntax_tree_cotext && other) = default;
+    syntax_tree_cotext & operator = (syntax_tree_cotext && other) = default;
 
-    std::error_code error_code () const
+    parse_result<string_type> && result ()
     {
-        return _error_spec.ec;
-    }
-
-    int error_line () const
-    {
-        return _error_spec.lineno;
-    }
-
-    string_type error_text () const
-    {
-        return _error_spec.what;
-    }
-
-    size_t rules_count () const
-    {
-        assert(_rulelist);
-        return _rulelist->size();
+        return std::move(_parse_result);
     }
 
 public: // Parse context requiremenets
     // xLCOV_EXCL_START
     void error (std::error_code ec, forward_iterator near_pos)
     {
-        _error_spec.ec = ec;
-        _error_spec.lineno = near_pos.lineno();
+        _parse_result.ec = ec;
+        _parse_result.lineno = near_pos.lineno();
     }
 
     void syntax_error (std::error_code ec
         , forward_iterator near_pos
         , string_type const & what)
     {
-        _error_spec.ec = ec;
-        _error_spec.lineno = near_pos.lineno();
-        _error_spec.what = what;
+        _parse_result.ec = ec;
+        _parse_result.lineno = near_pos.lineno();
+        _parse_result.what = what;
     }
     // xLCOV_EXCL_STOP
 
@@ -219,7 +210,14 @@ public: // Parse context requiremenets
     bool end_document (bool success)
     {
         assert(_stack.size() == 1);
-        return true;
+        assert(_stack.top()->type() == node_enum::rulelist);
+
+        // Static unique pointer cast
+        _parse_result.root = std::unique_ptr<rulelist_node_type>(
+            static_cast<rulelist_node_type*>(_stack.top().release()));
+
+        _stack.pop();
+        return success;
     }
 
     // ProseContext
@@ -350,7 +348,7 @@ public: // Parse context requiremenets
             std::cout << indent() << "END group: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
 
-        return true;
+        return success;
     }
 
     // OptionContext
@@ -386,7 +384,7 @@ public: // Parse context requiremenets
             std::cout << indent() << "END option: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
 
-        return true;
+        return success;
     }
 
     // RepeatContext
@@ -443,7 +441,7 @@ public: // Parse context requiremenets
             std::cout << indent() << "END repetition: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
 
-        return true;
+        return success;
     }
 
     // AlternationContext
@@ -471,7 +469,7 @@ public: // Parse context requiremenets
             std::cout << indent() << "END alternation: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
 
-        return true;
+        return success;
     }
 
     // ConcatenationContext
@@ -499,7 +497,7 @@ public: // Parse context requiremenets
             std::cout << indent() << "END concatenation: " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
 
-        return true;
+        return success;
     }
 
     bool begin_rule (forward_iterator first, forward_iterator last
@@ -567,29 +565,85 @@ public: // Parse context requiremenets
                 << ": " << (success ? "SUCCESS" : "FAILED") << "\n"
         ));
 
-        return true;
+        return success;
     }
 };
 
-template <typename StringType, typename ForwardIterator>
-inline syntax_tree<StringType, ForwardIterator> parse (
-      ForwardIterator & first
-    , ForwardIterator last)
+////////////////////////////////////////////////////////////////////////////////
+// syntax_tree
+////////////////////////////////////////////////////////////////////////////////
+template <typename StringType>
+class syntax_tree final
 {
-    using context_type = syntax_tree<StringType, ForwardIterator>;
+    using string_type = StringType;
+    using rulelist_node_type = rulelist_node<string_type>;
+
+    parse_result<string_type> _d;
+
+protected:
+    syntax_tree (parse_result<string_type> && result)
+        : _d(std::move(result))
+    {}
+
+public:
+    syntax_tree (syntax_tree const &) = delete;
+    syntax_tree & operator = (syntax_tree const &) = delete;
+
+    syntax_tree (syntax_tree &&) = default;
+    syntax_tree & operator = (syntax_tree &&) = default;
+
+    std::error_code error_code () const
+    {
+        return _d.ec;
+    }
+
+    int error_line () const
+    {
+        return _d.lineno;
+    }
+
+    string_type error_text () const
+    {
+        return _d.what;
+    }
+
+    size_t rules_count () const
+    {
+        return _d.root ? _d.root->size() : 0;
+    }
+
+    template <typename S, typename F>
+    friend syntax_tree<S> parse (F & first, F last);
+};
+
+/**
+ * @brief Parse the grammar.
+ * @param first First position.
+ * @param last Last position.
+ * @return Syntax tree.
+ */
+template <typename StringType, typename ForwardIterator>
+inline syntax_tree<StringType> parse (ForwardIterator & first, ForwardIterator last)
+{
+    using context_type = syntax_tree_cotext<StringType, ForwardIterator>;
     using forward_iterator = typename context_type::forward_iterator;
     forward_iterator f(first);
     forward_iterator l(last);
     context_type ctx;
 
-    advance_rulelist(f, l, ctx);
+    auto r = advance_rulelist(f, l, ctx);
     first = f.base();
-    return std::move(ctx);
+
+    return syntax_tree<StringType>{ctx.result()};
 }
 
-template <typename StringType, typename ForwardIterator>
-inline syntax_tree<StringType, ForwardIterator> parse_source (
-    StringType const & source)
+/**
+ * @brief Parse the grammar.
+ * @param source String representation of grammar.
+ * @return Syntax tree.
+ */
+template <typename StringType>
+inline syntax_tree<StringType> parse_source (StringType const & source)
 {
     return parse(source.begin(), source.end());
 }
