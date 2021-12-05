@@ -203,7 +203,6 @@ TEST_CASE("Syntax Tree") {
         if (first != last)
             std::cerr << "ERROR: parse is incomplete" << std::endl;
 
-
         CHECK_MESSAGE(!st.error_code(), item.filename);
         CHECK((first == last));
         CHECK(st.rules_count() == item.rulenames);

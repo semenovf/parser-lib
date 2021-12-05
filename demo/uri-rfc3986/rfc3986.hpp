@@ -7,85 +7,160 @@
 //      2021.02.25 Initial version
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "pfs/parser/abnf/parser.hpp"
-#include "pfs/parser/line_counter_iterator.hpp"
+#include <string>
+#include <iostream>
+#include <vector>
 
 namespace grammar {
 namespace rfc3986 {
 
-using forward_iterator = pfs::parser::line_counter_iterator<std::string::const_iterator>;
+using string_type = std::string;
 
-class context
+struct visitor
 {
-    int rulenames = 0;
-    std::string _lastError;
+    std::vector<string_type> _rules;
 
-public:
-    std::string lastError () const
+    int _indent_level = 0;
+    int _indent_step = 4;
+
+    string_type indent ()
     {
-        return _lastError;
+        string_type result {1, '|'};
+        auto i = _indent_level;
+
+        while (i--) {
+            result += string_type(_indent_step, '-');
+
+            if (i > 0)
+                result += string_type(1, '|');
+        }
+
+        return result;
     }
 
-    bool begin_document () { return true; }
-    bool end_document (bool) { return true; }
-
-    // ProseContext
-    bool prose (forward_iterator, forward_iterator) { return true; }
-
-    // NumberContext
-    bool first_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) { return true; }
-    bool last_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) { return true; }
-    bool next_number (pfs::parser::abnf::number_flag, forward_iterator, forward_iterator) { return true; }
-
-    // QuotedStringContext
-    bool quoted_string (forward_iterator, forward_iterator) { return true; }
-
-    void error (std::error_code ec, forward_iterator near_pos)
+    void prose (string_type const & text)
     {
-        _lastError = ec.message();
-        _lastError += " at ";
-        _lastError += std::to_string(near_pos.lineno());
-        _lastError += " line";
+        std::cout << indent() << "PROSE: \"" << text << "\"" << std::endl;
     }
 
-    size_t max_quoted_string_length () { return 0; }
-
-    // GroupContext
-    bool begin_group () { return true; }
-    bool end_group (bool success) { return true; }
-
-    // OptionContext
-    bool begin_option () { return true; }
-    bool end_option (bool success) { return true; }
-
-    // RepeatContext
-    bool repeat (long from, long to) { return true; }
-
-    // RulenameContext
-    bool rulename (forward_iterator first, forward_iterator last) { return true; }
-
-    // RepetitionContext
-    bool begin_repetition () { return true; }
-    bool end_repetition (bool success) { return true; }
-
-    // AlternationContext
-    bool begin_alternation () { return true; }
-    bool end_alternation (bool success) { return true; }
-
-    // ConcatenationContext
-    bool begin_concatenation () { return true; }
-    bool end_concatenation (bool success) { return true; }
-
-    // RuleContext
-    bool begin_rule (forward_iterator, forward_iterator
-        , bool is_incremental_alternatives)
+    void number_range (string_type const & from, string_type const & to)
     {
-        if (!is_incremental_alternatives)
-            rulenames++;
-        return true;
+        std::cout << indent() << "NUMBER RANGE: " << from << " - " << to << std::endl;
     }
 
-    bool end_rule (forward_iterator, forward_iterator, bool, bool) { return true; }
+    void number (string_type const & text)
+    {
+        std::cout << indent() << "NUMBER: " << text << std::endl;
+    }
+
+    void quoted_string (string_type const & text)
+    {
+        std::cout << indent() << "QUOTED STRING: \"" << text << "\"" << std::endl;
+    }
+
+    void rulename (string_type const & text)
+    {
+        std::cout << indent() << "RULENAME: \"" << text << "\"" << std::endl;
+    }
+
+    void begin_repetition ()
+    {
+        std::cout << indent() << "BEGIN REPETITION" << std::endl;
+        ++_indent_level;
+    }
+
+    void end_repetition ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END REPETITION" << std::endl;
+    }
+
+    void begin_group ()
+    {
+        std::cout << indent() << "BEGIN GROUP" << std::endl;
+        ++_indent_level;
+    }
+
+    void end_group ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END GROUP" << std::endl;
+    }
+
+    void begin_option ()
+    {
+        std::cout << indent() << "BEGIN OPTION" << std::endl;
+        ++_indent_level;
+    }
+
+    void end_option ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END OPTION" << std::endl;
+    }
+
+    void begin_concatenation ()
+    {
+        std::cout << indent() << "BEGIN CONCATENATION" << std::endl;
+        ++_indent_level;
+    }
+
+    void end_concatenation ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END CONCATENATION" << std::endl;
+    }
+
+    void begin_alternation ()
+    {
+        std::cout << indent() << "BEGIN ALTERNATION" << std::endl;
+        ++_indent_level;
+    }
+
+    void end_alternation ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END ALTERNATION" << std::endl;
+    }
+
+    void begin_rule (string_type const & name)
+    {
+        std::cout << indent() << "BEGIN RULE: \"" << name << "\"" << std::endl;
+        ++_indent_level;
+        _rules.emplace_back(string_type{name});
+    }
+
+    void end_rule ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END RULE" << std::endl;
+    }
+
+    void begin_document ()
+    {
+        std::cout << indent() << "BEGIN DOCUMENT" << std::endl;
+        ++_indent_level;
+    }
+
+    void end_document ()
+    {
+        --_indent_level;
+        std::cout << indent() << "END DOCUMENT" << std::endl;
+
+        int rule_counter = 1;
+
+        std::cout << "\n";
+        std::cout
+            << R"(////////////////////////////////////////////////////////////////////////////////)" << '\n'
+            << R"(// THIS FILE GENERATED AUTOMATICALLY BY pfs-parser (C) generator                )" << '\n'
+            << R"(// DATE: )" << __DATE__ << "\n"
+            << R"(// TIME: )" << __TIME__ << "\n"
+            << R"(////////////////////////////////////////////////////////////////////////////////)" << '\n';
+
+        for (auto const & r: _rules) {
+            std::cout << rule_counter++ << '.' << ' ' << r << std::endl;
+        }
+    }
 };
 
 }} // grammar::rfc3986
