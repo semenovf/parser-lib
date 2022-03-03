@@ -8,7 +8,7 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/gxhqybsbyqfivlwi?svg=true)](https://ci.appveyor.com/project/semenovf/pfs-parser)
 [![codecov](https://codecov.io/gh/semenovf/pfs-parser/branch/master/graph/badge.svg?token=4tY6jqPB7i)](https://codecov.io/gh/semenovf/pfs-parser)
 
-# pfs-parser
+# parser-lib
 Parser generator library and tools
 
 ## Licences
