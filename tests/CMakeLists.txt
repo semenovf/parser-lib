@@ -1,11 +1,19 @@
 ################################################################################
-# Copyright (c) 2021 Vladislav Trifochkin
+# Copyright (c) 2021-2024 Vladislav Trifochkin
 #
-# This file is part of [pfs-parser](https://github.com/semenovf/pfs-parser) library.
+# This file is part of `parser-lib`.
 ################################################################################
-project(${_project_basename}_TESTS)
+project(parser_TESTS CXX C)
 
-option(${_project_basename}_ENABLE_COVERAGE "Build tests with coverage support" OFF)
+if (PFS__ENABLE_COVERAGE)
+    message(STATUS "Coverage feature enabled")
+    if (NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        message(FATAL_ERROR "Coverage feature requires GCC")
+    endif()
+
+    set(CMAKE_CXX_FLAGS "-g -O0 --coverage")
+    set(CMAKE_C_FLAGS "-g -O0 --coverage")
+endif()
 
 # Copy test files to build folder
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION .)
@@ -19,7 +27,7 @@ set(TEST_NAMES
 
 foreach (name ${TEST_NAMES})
     if (${name}_SOURCES)
-        add_executable(${name} ${name}.cpp ${${name}_SOURCES})
+        add_executable(${name} ${${name}_SOURCES} ${name}.cpp)
     else ()
         add_executable(${name} ${name}.cpp)
     endif()
@@ -30,7 +38,7 @@ foreach (name ${TEST_NAMES})
     #       This option is used to compile and link code instrumented for
     #       coverage analysis. The option is a synonym for -fprofile-arcs
     #       -ftest-coverage (when compiling) and -lgcov (when linking).
-    if (${_project_basename}_ENABLE_COVERAGE)
+    if (PFS__ENABLE_COVERAGE)
         target_compile_options(${name} PRIVATE -g -O0 --coverage)
         target_link_libraries(${name} PRIVATE -g -O0 --coverage)
     endif()
@@ -39,7 +47,7 @@ foreach (name ${TEST_NAMES})
     add_test(NAME ${name} COMMAND ${name})
 endforeach()
 
-if (${_project_basename}_ENABLE_COVERAGE)
+if (PFS__ENABLE_COVERAGE)
     include(${CMAKE_SOURCE_DIR}/cmake/Coverage.cmake)
     coverage_target("'/usr/*';'*/doctest.h'")
 endif()

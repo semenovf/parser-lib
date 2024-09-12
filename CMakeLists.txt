@@ -1,44 +1,37 @@
 ################################################################################
-# Copyright (c) 2021 Vladislav Trifochkin
+# Copyright (c) 2021-2024 Vladislav Trifochkin
 #
-# This file is part of [pfs-parser](https://github.com/semenovf/pfs-parser) library.
+# This file is part of `parser-lib`.
 ################################################################################
-cmake_minimum_required (VERSION 3.5)
-project(pfs-parser VERSION 1.0 LANGUAGES CXX)
+cmake_minimum_required (VERSION 3.11)
+project(parser-ALL CXX C)
 
-string(REPLACE "-" "::" _project_alias ${PROJECT_NAME})
-set(_project_basename ${PROJECT_NAME})
+option(PARSER__BUILD_STRICT "Build with strict policies: C++ standard required, C++ extension is OFF etc" ON)
+option(PARSER__BUILD_TESTS "Build tests" OFF)
+option(PARSER__BUILD_DEMO "Build examples/demo" OFF)
+option(PARSER__ENABLE_COVERAGE "Build tests with coverage support" OFF)
 
-option(${PROJECT_NAME}_BUILD_TESTS "Build tests" OFF)
-option(${PROJECT_NAME}_BUILD_DEMO "Build demo" OFF)
+if (NOT PORTABLE_TARGET__ENABLED)
+    list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/2ndparty/portable-target/cmake/v2)
+    include(PortableTarget)
+    portable_target(SET ENABLE_TRACE ON)
+endif()
 
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
 message(STATUS "C++ compiler version: ${CMAKE_CXX_COMPILER_VERSION}")
-message(STATUS "Project alias: ${_project_alias}")
 
-set(CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF) # use -std=c++XX rather than -std=gnu++XX
-
-# This is OBSOLETE.
-# Use in-source check:
-# #if __cplusplus > 201703L && __cpp_concepts >= 201907L
-#       ...
-# #endif
-# include(${CMAKE_SOURCE_DIR}/cmake/cxx20_concepts.cmake)
-
-add_library(${PROJECT_NAME} INTERFACE)
-add_library(${_project_alias} ALIAS ${PROJECT_NAME})
-target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include)
-
-if (PFS_CXX_HAVE_CONCEPTS)
-    target_compile_definitions(${PROJECT_NAME} INTERFACE PFS_CXX_HAVE_CONCEPTS)
+if (PARSER__BUILD_STRICT)
+    set(CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_EXTENSIONS OFF) # use -std=c++XX rather than -std=gnu++XX
 endif()
 
-if (${PROJECT_NAME}_BUILD_TESTS)
+include(${CMAKE_CURRENT_LIST_DIR}/library.cmake)
+
+if (PARSER__BUILD_TESTS AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/tests)
     enable_testing()
     add_subdirectory(tests)
 endif()
 
-if (${PROJECT_NAME}_BUILD_DEMO)
+if (PARSER__BUILD_DEMO AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/demo)
     add_subdirectory(demo)
 endif()

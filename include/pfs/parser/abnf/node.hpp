@@ -70,7 +70,7 @@ protected:
 protected:
     string_node (node_enum type, StringType && text)
         : basic_node(type)
-        , _text(std::forward<StringType>(text))
+        , _text(std::move(text))
     {}
 
 public:
@@ -79,7 +79,7 @@ public:
 
     string_node (string_node && other)
         : basic_node(node_enum::prose)
-        , _text(std::forward<StringType>(other._text))
+        , _text(std::move(other._text))
     {}
 
     string_node & operator = (string_node && other) = delete;
@@ -100,7 +100,7 @@ class prose_node : public string_node<StringType>
 
 public:
     prose_node (StringType && text)
-        : base_class(node_enum::prose, std::forward<StringType>(text))
+        : base_class(node_enum::prose, std::move(text))
     {}
 };
 
@@ -126,7 +126,7 @@ public:
     void set_first (StringType && text)
     {
         assert(_value.size() == 0);
-        _value.push_back(std::forward<StringType>(text));
+        _value.push_back(std::move(text));
     }
 
     // Set last in a range
@@ -134,14 +134,14 @@ public:
     {
         assert(_value.size() == 1);
         _is_range = true;
-        _value.push_back(std::forward<StringType>(text));
+        _value.push_back(std::move(text));
     }
 
     void push_next (StringType && text)
     {
         assert(_value.size() > 0);
         assert(_is_range != true);
-        _value.push_back(std::forward<StringType>(text));
+        _value.push_back(std::move(text));
     }
 
     bool is_range () const
@@ -171,7 +171,7 @@ class quoted_string_node : public string_node<StringType>
 
 public:
     quoted_string_node (StringType && text)
-        : base_class(node_enum::quoted_string, std::forward<StringType>(text))
+        : base_class(node_enum::quoted_string, std::move(text))
     {}
 };
 
@@ -186,7 +186,7 @@ class rulename_node : public string_node<StringType>
 
 public:
     rulename_node (StringType && text)
-        : base_class(node_enum::rulename, std::forward<StringType>(text))
+        : base_class(node_enum::rulename, std::move(text))
     {}
 };
 
@@ -250,7 +250,7 @@ public:
 
     void push_back (item_type && item)
     {
-        _siblings.push_back(std::forward<item_type>(item));
+        _siblings.push_back(std::move(item));
     }
 
     template <typename Visitor>
@@ -279,7 +279,7 @@ public:
 
     void set_name (StringType && name)
     {
-        _name = std::forward<StringType>(name);
+        _name = std::move(name);
     }
 
     StringType name () const
@@ -365,8 +365,7 @@ public:
 
     void emplace (string_type && name, item_type && item)
     {
-        _rules.emplace(std::forward<string_type>(name)
-            , std::forward<item_type>(item));
+        _rules.emplace(std::move(name), std::move(item));
     }
 
     std::pair<bool, item_type> extract (string_type const & name)
